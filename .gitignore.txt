@@ -1,0 +1,33 @@
+# ========================
+# OS Files
+# ========================
+.DS_Store
+Thumbs.db
+
+# ========================
+# Python / FastAPI Backend
+# ========================
+backend/venv/
+backend/__pycache__/
+backend/.pytest_cache/
+backend/.env
+
+# Ignore uploaded images for the API
+backend/uploads/
+
+# Ignore large AI datasets and training runs (GitHub blocks files > 100MB)
+backend/datasets/
+backend/runs/
+# Note: We will NOT ignore yolov8n.pt because it is only ~6MB and needed to run the app.
+
+# ========================
+# Flutter / Mobile App
+# ========================
+# (Note: Flutter auto-generates a .gitignore inside the mobile_app folder, 
+# but we add these here as a failsafe)
+mobile_app/.dart_tool/
+mobile_app/build/
+mobile_app/.pub-cache/
+mobile_app/.pub/
+mobile_app/android/.gradle/
+mobile_app/ios/Pods/

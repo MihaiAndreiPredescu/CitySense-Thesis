@@ -1,5 +1,5 @@
 name: mobile_app
-description: "A new Flutter project."
+description: "CitySense Android-first civic pothole reporting app."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -30,6 +30,11 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  dio: ^5.4.3
+  geolocator: ^11.0.1
+  image_picker: ^1.1.2
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.

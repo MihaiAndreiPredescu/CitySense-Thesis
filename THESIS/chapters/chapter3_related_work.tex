@@ -1,0 +1,30 @@
+\chapter{Related Work}
+
+\section{Civic Reporting Platforms}
+
+Digital civic reporting is not a new idea, but existing platforms often focus on ticket intake rather than automated interpretation. The Federal Highway Administration discusses several collective-information applications, including systems such as Street Bump, that attempt to collect road-condition signals directly from citizens or drivers \cite{fhwa2022collective}. These platforms show that citizen participation can be valuable, but they also reveal a recurring trade-off: a richer submission form can improve report quality, while a shorter form increases the likelihood that users will report an issue at all.
+
+This trade-off is important for CitySense. Rather than asking the user to manually categorize the issue, the project aims to remove that step and let the backend infer the pothole label from the image. In this sense, CitySense belongs to the same family of civic tools as existing reporting platforms, but it shifts part of the reporting burden from the user to the software stack.
+
+\section{Pothole Management Systems}
+
+Cheng proposes a prototype pothole management program that connects reporting, tracking, and maintenance workflows in a single system \cite{cheng2024potholeprogram}. That work is closely related to the motivation of this thesis because it frames pothole reporting as part of a larger management process rather than as an isolated mobile feature. The report emphasizes that citizen participation, simplified submission, and clear operational handling are all necessary for a useful pothole workflow.
+
+CitySense follows a similar systems perspective, but it differentiates itself in two ways. First, it introduces a vision-based categorization step into the report lifecycle. Second, it uses spatial duplicate merging to reduce database clutter caused by repeated reports from the same location. These choices are intended to support the same operational goal with a stronger automation emphasis.
+
+\section{Road Damage Detection Research}
+
+Road damage detection has become an active research topic in computer vision. Arya et al.\ review state-of-the-art solutions and summarize the challenges of detecting cracks, potholes, and related road defects across varied image conditions \cite{arya2022rdd2022}. A central contribution of this line of work is the Road Damage Detection dataset family, especially RDD2022, which provides a public benchmark across multiple countries and road conditions \cite{arya2022rdd2022}. Public datasets of this type are important because they make it easier to compare models and train defect detectors that generalize beyond a single city or camera setup.
+
+The CitySense project does not attempt to introduce a novel detector architecture. Instead, it adopts the practical position that a modern YOLO-based detector can be integrated into a civic workflow if the system carefully restricts the supported label space and clearly defines the scope of the application. This makes the project closer to applied engineering than pure machine learning research, while still benefiting from the methodological progress of recent detection literature.
+
+\section{Positioning of CitySense}
+
+The closest related systems therefore come from two directions:
+
+\begin{itemize}
+  \item civic technology applications that make it easier for citizens to submit and track public-works issues;
+  \item computer vision systems that detect road damage from images.
+\end{itemize}
+
+CitySense occupies the intersection of these two directions. It is not merely a reporting form with a map, and it is not merely a detector benchmark. Its purpose is to connect image-based pothole recognition with a practical reporting pipeline that includes mobile capture, geospatial duplicate handling, and an administrative view of active issues. This combined focus defines the main niche of the project.

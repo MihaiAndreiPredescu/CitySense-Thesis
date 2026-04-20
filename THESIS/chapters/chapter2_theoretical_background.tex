@@ -1,0 +1,35 @@
+\chapter{Theoretical Background}
+
+CitySense combines mobile computing, backend web services, computer vision, and geographic information systems. This chapter summarizes the concepts that are most relevant to the implementation.
+
+\section{Cross-Platform Mobile Development with Flutter}
+
+Flutter is a cross-platform UI toolkit that enables the development of mobile applications from a single Dart codebase \cite{flutter_docs}. Instead of relying on a bridge to native widgets, Flutter renders its own widget tree, which makes the visual layer consistent across platforms. For a project like CitySense, this is useful because the interaction is strongly guided by a small set of reusable screens: a camera-driven reporting view, a map view, and status feedback components.
+
+Another relevant feature is Flutter's plugin ecosystem. Access to the device camera and location sensors is exposed through packages that wrap platform-specific behavior behind a single interface. This makes it possible to build an Android-first prototype without writing a separate Kotlin application from scratch, while still preserving the possibility of extending the same client to iOS later.
+
+\section{Python APIs with FastAPI}
+
+FastAPI is a Python web framework designed around asynchronous request handling, automatic request validation, and concise API definitions \cite{fastapi_docs}. It is well suited to CitySense because the backend requirements are clear and structured: accept multipart form uploads, validate coordinates, expose JSON report data, and render an administrative HTML page.
+
+The framework also integrates naturally with Pydantic-based schemas, which is helpful when the same data model must be used consistently across multiple endpoints. In CitySense, the backend exposes health, report submission, report listing, and status update endpoints. Each endpoint benefits from explicit request and response schemas because the mobile client and the dashboard depend on predictable field names and types.
+
+\section{Object Detection and YOLO-Based Inference}
+
+Object detection differs from image classification in that it must identify both the class of an object and its approximate position in the image. The original YOLO formulation reframed detection as a single-stage regression problem, allowing the network to predict classes and bounding boxes in one pass \cite{redmon2016yolo}. This approach made it possible to trade some complexity in favor of real-time or near-real-time inference.
+
+The implementation used in this project is based on Ultralytics YOLO \cite{jocher2023ultralytics}. In practical terms, the detector receives an image and returns one or more bounding boxes with associated classes and confidence scores. For CitySense, the backend accepts only pothole-related labels as valid output. This normalization step is important because a general-purpose detector may return classes that are outside the scope of the application. The system therefore treats the detector not as a free-form classifier but as a bounded service with a clearly defined output contract.
+
+\section{Spatial Data and PostGIS}
+
+PostgreSQL is a relational database system with strong support for transactional integrity, indexing, and structured queries \cite{postgres_docs}. PostGIS extends PostgreSQL with spatial types and spatial functions, which makes it possible to store locations as geographic objects and query them by distance \cite{obe2021postgis}. This is essential for CitySense because duplicate detection is fundamentally a spatial problem.
+
+The core function used in the implementation is \texttt{ST\_DWithin}. Given two geographic points and a distance threshold, this function checks whether the points are within that threshold. By storing each report as a point geometry and using a fixed radius, the backend can decide whether a new pothole report should become a fresh ticket or an upvote on an existing one. This is more robust than comparing latitude and longitude directly because it treats geographic distance as the real business rule.
+
+\section{Map Rendering with OpenStreetMap and Leaflet}
+
+An administrator-facing map is useful only if it provides geographic context and remains easy to interpret. CitySense uses OpenStreetMap tiles as the geographic base layer \cite{openstreetmap}. The web dashboard uses Leaflet for browser-based map rendering \cite{leaflet_docs}, while the mobile client uses Flutter map rendering components built on the same OpenStreetMap tile model. The shared map foundation ensures that administrators and citizens interpret issue locations in a consistent geographic frame.
+
+\section{Summary}
+
+The theoretical foundation of CitySense can therefore be summarized as follows: Flutter provides the mobile interaction layer, FastAPI structures the HTTP API, YOLO enables pothole-oriented image analysis, and PostGIS supplies the spatial operators required for duplicate merging. The implementation chapter builds directly on these concepts.

@@ -1,17 +1,43 @@
-version: '3.8'
-
 services:
   db:
-    image: postgis/postgis:15-3.3
+    image: postgis/postgis:16-3.4
     container_name: citysense_db
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=mysecretpassword
-      - POSTGRES_DB=citysense
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-citysense}
+      POSTGRES_DB: citysense
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d citysense"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     ports:
       - "5432:5432"
     volumes:
       - postgis_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: citysense_backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-citysense}
+      DATABASE_URL: postgresql+psycopg2://postgres:${POSTGRES_PASSWORD:-citysense}@db:5432/citysense
+      DETECTOR_MODE: ${DETECTOR_MODE:-demo}
+      MODEL_PATH: /app/data/models/pothole_yolov8n.pt
+      DUPLICATE_RADIUS_METERS: ${DUPLICATE_RADIUS_METERS:-10}
+      MIN_DETECTION_CONFIDENCE: ${MIN_DETECTION_CONFIDENCE:-0.35}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8000,http://10.0.2.2:8000}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data/uploads:/app/data/uploads
+      - ./data/models:/app/data/models
     restart: unless-stopped
 
 volumes:

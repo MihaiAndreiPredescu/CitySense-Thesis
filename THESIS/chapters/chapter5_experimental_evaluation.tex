@@ -1,0 +1,61 @@
+\chapter{Experimental Evaluation}
+
+\section{Evaluation Strategy}
+
+The evaluation of CitySense focuses on end-to-end software behavior rather than on claiming a new state-of-the-art detector. This choice follows directly from the scope of the project: the main contribution is the integration of mobile reporting, backend processing, and spatial duplicate handling into a single workflow. Therefore, the evaluation emphasizes functional scenarios, qualitative detector readiness, and system limitations.
+
+\section{Functional Scenarios}
+
+Table~\ref{tab:functional_tests} summarizes the main functional scenarios used to evaluate the implementation.
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.28\linewidth} >{\raggedright\arraybackslash}p{0.28\linewidth} >{\raggedright\arraybackslash}p{0.34\linewidth}}
+\toprule
+\textbf{Scenario} & \textbf{Expected Result} & \textbf{Observed Outcome} \\
+\midrule
+Health endpoint request & Backend reports runtime configuration & Endpoint returns detector mode, model path, upload directory, and duplicate radius. \\
+New pothole report & New database record is created & Implemented through \texttt{POST /api/v1/reports}. \\
+Nearby repeat report & Existing ticket is merged and upvotes increase & Implemented through PostGIS \texttt{ST\_DWithin} duplicate checking. \\
+Open reports map view & User sees active tickets on a map & Implemented on both the mobile map screen and the admin dashboard. \\
+Status update & Administrator marks an issue as resolved & Implemented through \texttt{PATCH /api/v1/reports/\{id\}/status}. \\
+UI smoke test without model & Client and backend remain demonstrable & Supported by the explicit backend demo detector mode. \\
+\bottomrule
+\end{tabular}
+\caption{Functional scenarios used to evaluate the CitySense workflow.}
+\label{tab:functional_tests}
+\end{table}
+
+These scenarios validate the main user journey. A citizen can submit a report, the backend can decide whether to create or merge it, and an administrator can inspect and resolve the resulting issue. This establishes that the software architecture is coherent even before large-scale field deployment.
+
+\section{Detector Readiness}
+
+The computer vision layer is evaluated in a pragmatic manner. The repository includes the infrastructure required to fine-tune a pothole detector on an RDD2022-style dataset \cite{arya2022rdd2022}, as well as a batch evaluation utility for local image folders. The backend also enforces an output contract: only pothole-compatible labels are accepted as valid application results.
+
+At the same time, this thesis does not claim a benchmark-grade quantitative result such as mean average precision on a published test split. A fully reproducible detector benchmark requires a dedicated checkpoint, a stable training environment, and a controlled evaluation dataset. Those steps are prepared in the implementation, but they should be treated as follow-up work rather than as completed experimental evidence. The present document therefore limits itself to qualitative detector integration and to the software behavior that depends on that integration.
+
+\section{Qualitative Observations}
+
+From a software engineering perspective, several observations emerged during implementation:
+
+\begin{itemize}
+  \item the mobile workflow benefits significantly from removing manual category selection;
+  \item duplicate merging improves the clarity of the map view because repeated reports accumulate as upvotes rather than as overlapping markers;
+  \item the administrative dashboard becomes more actionable when status and geographic context are shown together;
+  \item separating detector mode from the rest of the backend logic makes the system easier to test without conflating smoke tests with real model evaluation.
+\end{itemize}
+
+These observations support the main thesis argument: the value of CitySense comes from the combination of automation and geospatial prioritization, not from any one component in isolation.
+
+\section{Current Limitations}
+
+The current version of CitySense has several limitations that are important to document explicitly:
+
+\begin{enumerate}[label=\arabic*.]
+  \item The implementation is pothole-first and does not yet support a broader civic issue taxonomy.
+  \item No municipality-specific authentication or work-order integration is included.
+  \item Quantitative detector benchmarking is prepared but not yet finalized inside this local environment.
+  \item The mobile client is optimized for Android-first demonstration rather than full production deployment across app stores.
+\end{enumerate}
+
+These limitations do not invalidate the prototype, but they define the boundary between the implemented system and the broader product vision.

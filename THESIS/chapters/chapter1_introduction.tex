@@ -1,0 +1,50 @@
+\chapter{Introduction}
+
+Maintaining urban infrastructure is a continuous challenge for local authorities. Potholes, damaged road markings, broken public furniture, and illegal dumping all reduce safety and quality of life, yet these issues are often discovered too late or reported through inconvenient channels. Traditional reporting forms usually ask citizens to manually choose a category, describe the problem in text, and specify a location. This introduces friction for citizens and creates inconsistent data for municipalities. The broader problem is therefore not only detection of infrastructure defects, but also the design of a reporting workflow that encourages participation while keeping the resulting data actionable.
+
+This thesis addresses that problem through \textbf{CitySense}, a mobile-first pothole reporting system that combines computer vision, geographic information processing, and cross-platform mobile development. In the proposed workflow, a citizen uses a smartphone to capture a photo of a pothole. The mobile client records the current GPS coordinates and forwards the report to a backend service. The backend then performs two automated steps: it classifies the image as a pothole through a YOLO-based detector \cite{jocher2023ultralytics} and it checks whether a similar open issue already exists nearby by using PostGIS proximity queries \cite{obe2021postgis}. If a nearby report is found, the submission is merged as an additional vote instead of being inserted as a duplicate ticket.
+
+\section{Motivation}
+
+The motivation for the project is both practical and technical. From the practical perspective, citizens often notice infrastructure defects during routine activities such as commuting, walking, or driving, yet many do not report them because the process is slow or unclear. The Federal Highway Administration has documented that collective-information applications can support transportation safety data collection, but their effectiveness depends heavily on ease of use and the quality of the gathered data \cite{fhwa2022collective}. In the context of pothole management, Cheng shows that mobile reporting can improve how defects are tracked and prioritized, especially when citizens are directly involved in the reporting loop \cite{cheng2024potholeprogram}. These observations motivated the search for a more automated reporting pipeline.
+
+The technical motivation comes from the opportunity to combine several modern software engineering domains into a single, cohesive application. Flutter makes it possible to create a mobile interface from one codebase \cite{flutter_docs}. FastAPI provides a compact and expressive way to build Python REST services \cite{fastapi_docs}. YOLO-based detectors are fast enough to support practical image analysis workflows \cite{redmon2016yolo, jocher2023ultralytics}. PostGIS extends relational storage with spatial operators that are essential for duplicate detection based on geographic distance \cite{obe2021postgis}. CitySense brings these technologies together in a real-world civic use case.
+
+\section{Problem Statement}
+
+The problem addressed in this thesis can be stated as follows:
+
+\begin{quote}
+How can a civic reporting application reduce manual user input while preventing duplicate pothole tickets and still provide a simple operational view for administrators?
+\end{quote}
+
+To answer this question, the system must satisfy several constraints at the same time. The mobile workflow must remain simple enough for non-technical users. The backend must provide a stable API and a clear data model. The detector must expose only the classes that the system truly supports. The database must treat location as a first-class concern rather than an afterthought. Finally, the administrator-facing interface must show a clean and prioritized list of open issues rather than an uncontrolled stream of near-identical reports.
+
+\section{Objectives}
+
+The main objectives of the project are the following:
+
+\begin{enumerate}[label=\arabic*.]
+  \item Design and implement an Android-first mobile application that allows citizens to capture pothole reports using a camera-driven workflow.
+  \item Build a backend service that accepts image uploads and geographic coordinates through a documented REST API.
+  \item Integrate a YOLO-based detector that classifies a report as a pothole and returns a confidence score.
+  \item Use PostGIS to merge reports that refer to the same pothole when they are within a configurable spatial radius.
+  \item Provide a lightweight administrative dashboard that visualizes reports on top of OpenStreetMap \cite{openstreetmap} and supports status management.
+  \item Document the architecture, implementation choices, and evaluation strategy in a complete bachelor thesis.
+\end{enumerate}
+
+\section{Contributions}
+
+The contributions of the thesis are primarily engineering-oriented rather than algorithmic. The detector itself is not presented as a novel computer vision architecture. Instead, the project contributes:
+
+\begin{itemize}
+  \item an end-to-end software prototype that connects mobile capture, REST communication, object detection, and geospatial duplicate handling;
+  \item a report data model that explicitly separates issue type, geographic position, status, and priority;
+  \item a duplicate-merging workflow that turns repeated reports into upvotes instead of redundant database rows;
+  \item an operational dashboard that links geographic context with report status and upvote counts;
+  \item a reproducible monorepo structure that keeps implementation and thesis artifacts synchronized.
+\end{itemize}
+
+\section{Thesis Structure}
+
+Chapter 2 introduces the technologies that underpin the application, with emphasis on Flutter, FastAPI, YOLO-based detection, and PostGIS. Chapter 3 reviews related work in both civic issue reporting and road-damage detection. Chapter 4 presents the architecture and implementation of CitySense. Chapter 5 evaluates the resulting system through functional scenarios and discusses detector readiness and current limitations. Chapter 6 concludes the thesis and outlines directions for future work.

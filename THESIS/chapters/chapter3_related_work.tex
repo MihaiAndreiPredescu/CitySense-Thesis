@@ -2,6 +2,8 @@
 
 The second theoretical chapter has two goals. First, it places the project in the context of existing work. Second, it explains why the final technology stack was chosen. This is useful because a bachelor project is not only about building something that works, but also about showing that the chosen approach is reasonable when compared to alternatives.
 
+Table~\ref{tab:related_work_comparison} summarizes the main directions identified in the literature, while Figure~\ref{fig:citysense_positioning} shows how CitySense combines ideas from more than one category instead of belonging to only one of them.
+
 \section{Existing Civic Reporting Solutions}
 
 Digital reporting of public issues has been studied for several years. A common idea is to let citizens act as sensors by using their phones to send information about traffic, road defects, or other urban problems. The Federal Highway Administration mentions examples such as Street Bump and other collective-information systems that use mobile devices to gather road-related data \cite{fhwa2022collective}. These projects show that citizens can contribute valuable data, but they also show several recurring problems:
@@ -58,6 +60,22 @@ A simple relational database would not be enough because distance-based queries 
 
 YOLO was chosen because it offers a good balance between speed and practicality. For a backend service that may eventually process multiple images, a very heavy detection pipeline would make the user experience worse. A lightweight YOLO model is more realistic for this kind of application.
 
+\begin{table}[htbp]
+\centering
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.26\linewidth} >{\raggedright\arraybackslash}p{0.28\linewidth} >{\raggedright\arraybackslash}p{0.30\linewidth}}
+\toprule
+\textbf{Direction} & \textbf{Main Strength} & \textbf{Main Limitation for This Thesis} \\
+\midrule
+Generic civic reporting platforms & Encourage citizen participation and support issue intake. & They often rely on manual categorization and produce repeated reports for the same issue. \\
+Pothole management systems & Treat potholes as part of a broader maintenance workflow. & They may assume a larger municipal process than what a one-semester prototype can implement. \\
+Road-damage detection research & Offers datasets and models for automatic visual analysis. & It does not automatically solve report storage, map visualization, or duplicate merging. \\
+CitySense approach & Connects reporting, detection, and geographic deduplication in one flow. & It remains a focused prototype and does not cover the full municipal lifecycle. \\
+\bottomrule
+\end{tabular}
+\caption{Comparison between the main directions discussed in the related work chapter.}
+\label{tab:related_work_comparison}
+\end{table}
+
 \section{How CitySense Fits in This Context}
 
 After comparing the existing work and the stack choices, CitySense can be positioned as a software integration project with a focused civic use case. It is not only a reporting form, and it is not only a computer vision demo. It sits between those two areas.
@@ -70,5 +88,17 @@ The project contributes by connecting:
   \item geospatial duplicate detection;
   \item a dashboard view for operational use.
 \end{enumerate}
+
+\begin{figure}[htbp]
+\centering
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{c c c}
+\fbox{\parbox{0.19\textwidth}{\centering \textbf{Manual civic}\\\textbf{reporting}\\[4pt]\footnotesize Manual submission\\Weak automation}} &
+\fbox{\parbox{0.19\textwidth}{\centering \textbf{CitySense}\\\textbf{prototype}\\[4pt]\footnotesize Citizen app\\Backend + map\\AI-assisted flow}} &
+\fbox{\parbox{0.19\textwidth}{\centering \textbf{Detection}\\\textbf{research}\\[4pt]\footnotesize Focus on model quality\\Limited operational workflow}}
+\end{tabular}
+\caption{Positioning of CitySense between manual reporting platforms and pure detection-oriented research.}
+\label{fig:citysense_positioning}
+\end{figure}
 
 This combination is the main justification for the project. The next chapters move from theory to practice and explain how this idea was translated into actual requirements, code structure, and tested functionality.

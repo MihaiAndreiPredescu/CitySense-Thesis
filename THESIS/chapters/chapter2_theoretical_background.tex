@@ -2,6 +2,25 @@
 
 This chapter contains the first theoretical part of the thesis. The goal here is not to describe every technology in full detail, but to explain the concepts that were necessary for building the application. Since CitySense is a full-stack project, the theoretical background has to cover several areas: mobile development, web services, computer vision, and spatial data processing.
 
+The main technologies discussed in this chapter and their roles inside the project are summarized in Table~\ref{tab:theoretical_foundations}. Figure~\ref{fig:theoretical_component_flow} shows how these ideas connect in the reporting workflow.
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.22\linewidth} >{\raggedright\arraybackslash}p{0.24\linewidth} >{\raggedright\arraybackslash}p{0.42\linewidth}}
+\toprule
+\textbf{Area} & \textbf{Main Technology} & \textbf{Role in CitySense} \\
+\midrule
+Mobile client & Flutter & Provides the citizen-facing interface, camera access, location access, and map screens. \\
+Backend API & FastAPI & Exposes REST endpoints, validates requests, and coordinates report processing. \\
+Object detection & YOLO & Analyzes submitted images and returns pothole-oriented predictions. \\
+Spatial data & PostgreSQL + PostGIS & Stores reports and supports distance-based duplicate detection. \\
+Map rendering & OpenStreetMap + Leaflet & Supplies the geographic context used in mobile and admin map views. \\
+\bottomrule
+\end{tabular}
+\caption{Main theoretical components used by the CitySense project.}
+\label{tab:theoretical_foundations}
+\end{table}
+
 \section{Mobile Development for Citizen Reporting Applications}
 
 The first important topic is mobile development. In this type of application the phone is the main interface between the citizen and the system. Because of that, the application has to be simple, responsive, and able to access hardware components such as the camera and GPS sensor.
@@ -86,6 +105,27 @@ This design is better than exact coordinate matching. Two users standing on diff
 The last theoretical topic in this chapter is map visualization. A pothole report without geographic context is not very useful. Administrators need to know where the issue is located, and users benefit from seeing whether a problem has already been reported.
 
 CitySense uses OpenStreetMap as the geographic base layer \cite{openstreetmap}. On the web side, the map is rendered with Leaflet \cite{leaflet_docs}. On the mobile side, Flutter map widgets are used to display the same kind of tile-based geographic information. The advantage of this approach is that the whole system shares a common visual model of the city map.
+
+\begin{figure}[htbp]
+\centering
+\setlength{\tabcolsep}{6pt}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{c c c c c}
+\fbox{\parbox{0.14\textwidth}{\centering Citizen\\captures\\photo}} &
+$\rightarrow$ &
+\fbox{\parbox{0.16\textwidth}{\centering Mobile\\application}} &
+$\rightarrow$ &
+\fbox{\parbox{0.18\textwidth}{\centering FastAPI\\backend}} \\
+& & & & \\
+& & & $\searrow$ & \fbox{\parbox{0.18\textwidth}{\centering YOLO\\detection}} \\
+& & & $\nearrow$ & \fbox{\parbox{0.18\textwidth}{\centering PostGIS\\duplicate check}} \\
+& & & & \\
+\multicolumn{5}{c}{$\downarrow$} \\
+\multicolumn{5}{c}{\fbox{\parbox{0.28\textwidth}{\centering Map views for citizens and administrators}}}
+\end{tabular}
+\caption{Conceptual flow between the main components introduced in the theoretical background.}
+\label{fig:theoretical_component_flow}
+\end{figure}
 
 \section{Summary}
 

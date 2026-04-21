@@ -1,30 +1,74 @@
-\chapter{Related Work}
+\chapter{Related Work and Technology Choices}
 
-\section{Civic Reporting Platforms}
+The second theoretical chapter has two goals. First, it places the project in the context of existing work. Second, it explains why the final technology stack was chosen. This is useful because a bachelor project is not only about building something that works, but also about showing that the chosen approach is reasonable when compared to alternatives.
 
-Digital civic reporting is not a new idea, but existing platforms often focus on ticket intake rather than automated interpretation. The Federal Highway Administration discusses several collective-information applications, including systems such as Street Bump, that attempt to collect road-condition signals directly from citizens or drivers \cite{fhwa2022collective}. These platforms show that citizen participation can be valuable, but they also reveal a recurring trade-off: a richer submission form can improve report quality, while a shorter form increases the likelihood that users will report an issue at all.
+\section{Existing Civic Reporting Solutions}
 
-This trade-off is important for CitySense. Rather than asking the user to manually categorize the issue, the project aims to remove that step and let the backend infer the pothole label from the image. In this sense, CitySense belongs to the same family of civic tools as existing reporting platforms, but it shifts part of the reporting burden from the user to the software stack.
-
-\section{Pothole Management Systems}
-
-Cheng proposes a prototype pothole management program that connects reporting, tracking, and maintenance workflows in a single system \cite{cheng2024potholeprogram}. That work is closely related to the motivation of this thesis because it frames pothole reporting as part of a larger management process rather than as an isolated mobile feature. The report emphasizes that citizen participation, simplified submission, and clear operational handling are all necessary for a useful pothole workflow.
-
-CitySense follows a similar systems perspective, but it differentiates itself in two ways. First, it introduces a vision-based categorization step into the report lifecycle. Second, it uses spatial duplicate merging to reduce database clutter caused by repeated reports from the same location. These choices are intended to support the same operational goal with a stronger automation emphasis.
-
-\section{Road Damage Detection Research}
-
-Road damage detection has become an active research topic in computer vision. Arya et al.\ review state-of-the-art solutions and summarize the challenges of detecting cracks, potholes, and related road defects across varied image conditions \cite{arya2022rdd2022}. A central contribution of this line of work is the Road Damage Detection dataset family, especially RDD2022, which provides a public benchmark across multiple countries and road conditions \cite{arya2022rdd2022}. Public datasets of this type are important because they make it easier to compare models and train defect detectors that generalize beyond a single city or camera setup.
-
-The CitySense project does not attempt to introduce a novel detector architecture. Instead, it adopts the practical position that a modern YOLO-based detector can be integrated into a civic workflow if the system carefully restricts the supported label space and clearly defines the scope of the application. This makes the project closer to applied engineering than pure machine learning research, while still benefiting from the methodological progress of recent detection literature.
-
-\section{Positioning of CitySense}
-
-The closest related systems therefore come from two directions:
+Digital reporting of public issues has been studied for several years. A common idea is to let citizens act as sensors by using their phones to send information about traffic, road defects, or other urban problems. The Federal Highway Administration mentions examples such as Street Bump and other collective-information systems that use mobile devices to gather road-related data \cite{fhwa2022collective}. These projects show that citizens can contribute valuable data, but they also show several recurring problems:
 
 \begin{itemize}
-  \item civic technology applications that make it easier for citizens to submit and track public-works issues;
-  \item computer vision systems that detect road damage from images.
+  \item users do not always want to complete long reporting forms;
+  \item repeated reports may refer to the same physical issue;
+  \item municipalities need a simple way to interpret incoming data.
 \end{itemize}
 
-CitySense occupies the intersection of these two directions. It is not merely a reporting form with a map, and it is not merely a detector benchmark. Its purpose is to connect image-based pothole recognition with a practical reporting pipeline that includes mobile capture, geospatial duplicate handling, and an administrative view of active issues. This combined focus defines the main niche of the project.
+These observations are directly relevant to CitySense. My project does not try to replace municipal workflows completely. Instead, it focuses on one narrow improvement: make the reporting process short and use automation to reduce unnecessary manual work.
+
+\section{Pothole-Oriented Reporting Systems}
+
+Cheng's pothole management work is especially relevant because it discusses potholes as a complete management problem, not just as a single technical challenge \cite{cheng2024potholeprogram}. In practice, pothole handling involves several steps: identifying the defect, storing the report, deciding whether it is new or already known, assigning priority, and eventually marking it as solved.
+
+This systems view is also the direction followed in CitySense. The project is not limited to running a detector on an image. It also tries to answer practical questions such as:
+
+\begin{itemize}
+  \item How should a citizen create a report with minimal effort?
+  \item How should repeated reports be handled?
+  \item What information should the administrator see first?
+\end{itemize}
+
+Compared to generic pothole management systems, the distinctive element of CitySense is the combination of image-based issue labeling and geospatial duplicate merging inside one simple application flow.
+
+\section{Road Damage Detection Literature}
+
+The machine learning side of the project is influenced by road-damage detection research. Arya et al.\ provide a good overview of the current state of the field and discuss both the strengths and the limitations of existing approaches \cite{arya2022rdd2022}. One important point from this literature is that road-damage detection is difficult because the data is visually diverse. Lighting conditions, camera angle, road texture, and weather can all affect the result.
+
+Another important contribution of this research direction is the availability of public datasets. RDD2022 is especially relevant because it collects road-damage images from multiple countries and therefore offers more diversity than a small local dataset \cite{arya2022rdd2022}. For a student project, this matters a lot because building a custom dataset from scratch would require far more time than is realistically available in one semester.
+
+\subsection{Why the Thesis Does Not Claim a New Detection Model}
+
+It is important to state clearly that this thesis is not a pure machine learning paper. I do not propose a new architecture, a new loss function, or a new benchmark result. Instead, I use an existing YOLO-based implementation as a practical detector component inside a bigger software system. This keeps the scope realistic and matches the main goal of the thesis, which is to build a functional reporting platform.
+
+\section{Technology Choice Rationale}
+
+After looking at existing work, the next question is why the final stack was chosen. The answer is mostly practical: each technology solves one concrete problem in the project.
+
+\subsection{Why Flutter}
+
+Flutter was chosen because it made it possible to build the application UI quickly, use the camera and GPS packages from one codebase, and keep the project structured around screens and reusable widgets. Since the target was a demonstrable bachelor project and not a full production rollout, development speed was an important factor.
+
+\subsection{Why FastAPI}
+
+FastAPI was chosen because the backend only needed a focused API, not a heavy enterprise framework. It is well suited for handling file uploads, JSON responses, and small but clear schemas. For a student project, this keeps the code easier to understand and easier to present during the defense.
+
+\subsection{Why PostgreSQL and PostGIS}
+
+A simple relational database would not be enough because distance-based queries are central to the project. PostgreSQL with PostGIS offers both traditional relational storage and spatial operations in the same system. This made it a natural fit for report storage and duplicate detection.
+
+\subsection{Why YOLO}
+
+YOLO was chosen because it offers a good balance between speed and practicality. For a backend service that may eventually process multiple images, a very heavy detection pipeline would make the user experience worse. A lightweight YOLO model is more realistic for this kind of application.
+
+\section{How CitySense Fits in This Context}
+
+After comparing the existing work and the stack choices, CitySense can be positioned as a software integration project with a focused civic use case. It is not only a reporting form, and it is not only a computer vision demo. It sits between those two areas.
+
+The project contributes by connecting:
+
+\begin{enumerate}[label=\arabic*.]
+  \item a simple citizen-facing report flow;
+  \item automatic pothole labeling from an image;
+  \item geospatial duplicate detection;
+  \item a dashboard view for operational use.
+\end{enumerate}
+
+This combination is the main justification for the project. The next chapters move from theory to practice and explain how this idea was translated into actual requirements, code structure, and tested functionality.

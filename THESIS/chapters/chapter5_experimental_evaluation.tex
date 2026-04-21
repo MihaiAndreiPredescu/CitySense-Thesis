@@ -1,61 +1,206 @@
-\chapter{Experimental Evaluation}
+\chapter{Application Design, Implementation and Testing}
 
-\section{Evaluation Strategy}
+This chapter continues the practical part of the thesis. After defining the requirements in the previous chapter, the next step was to decide how the system should be organized and then implement the main functionalities. In this chapter I present the architecture of the application, the main implementation choices, and the way in which the final result was tested.
 
-The evaluation of CitySense focuses on end-to-end software behavior rather than on claiming a new state-of-the-art detector. This choice follows directly from the scope of the project: the main contribution is the integration of mobile reporting, backend processing, and spatial duplicate handling into a single workflow. Therefore, the evaluation emphasizes functional scenarios, qualitative detector readiness, and system limitations.
+\section{General Architecture}
 
-\section{Functional Scenarios}
+CitySense is organized as a client-server application with a small administrative web layer. The main components are:
 
-Table~\ref{tab:functional_tests} summarizes the main functional scenarios used to evaluate the implementation.
+\begin{enumerate}[label=\arabic*.]
+  \item the Flutter mobile application;
+  \item the FastAPI backend;
+  \item the PostgreSQL/PostGIS database;
+  \item the YOLO-based detection service integrated in the backend;
+  \item the administrator dashboard rendered in the browser.
+\end{enumerate}
+
+The flow between these components is the following:
+
+\begin{enumerate}[label=\arabic*.]
+  \item The mobile app captures the image and the user location.
+  \item The app sends the report to the backend through the REST API.
+  \item The backend stores the uploaded image and runs the detector.
+  \item The backend checks for a nearby duplicate through PostGIS.
+  \item The backend stores or merges the report in the database.
+  \item The app and the dashboard request the list of reports and render them on a map.
+\end{enumerate}
+
+This architecture was chosen because it keeps heavy logic out of the phone and makes the backend the single source of truth.
+
+\section{Design of the Mobile Application}
+
+The mobile application was designed around two screens, because this was enough to cover the main use cases and kept the interface easy to understand.
+
+\subsection{Report Screen}
+
+The report screen is the most important part of the citizen workflow. It contains:
+
+\begin{itemize}
+  \item a photo preview area;
+  \item a short status card with user feedback;
+  \item a button that triggers the camera flow and submission.
+\end{itemize}
+
+The implementation is intentionally direct. I wanted the user to understand immediately what the app is for. There are no advanced menus, no long forms, and no extra fields that could slow down the interaction. A screenshot of this interface is shown again in Figure~\ref{fig:app_interface}.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.45\textwidth]{figures/app_interface_pothole_1775200631079.png}
+    \caption{Main report screen of the mobile application.}
+    \label{fig:app_interface}
+\end{figure}
+
+\subsection{Map Screen}
+
+The second screen shows open reports on a map. Every report is represented by a marker, and the marker size and color help indicate how important the report is. If a marker is tapped, the application shows more details such as issue type, confidence, status, and upvote count.
+
+This screen covers functionality F2 from the semester work because it demonstrates that submitted reports are not just stored, but also visualized in a meaningful way.
+
+\subsection{Internal Flutter Structure}
+
+Inside the mobile project, the code is split into configuration, models, services, screens, and widgets. This was an intentional choice. Even though the project is not extremely large, placing all logic in one screen file would have made the code difficult to maintain. The separation currently looks like this:
+
+\begin{itemize}
+  \item \textbf{config} for application constants such as the backend URL;
+  \item \textbf{models} for data objects such as reports and statuses;
+  \item \textbf{services} for API communication and location access;
+  \item \textbf{screens} for the main pages of the app;
+  \item \textbf{widgets} for reusable interface pieces.
+\end{itemize}
+
+\section{Design of the Backend}
+
+The backend was implemented as a modular FastAPI application. I kept the routing layer small and moved the business logic into dedicated services. This decision made the code clearer and also made the chapter easier to write because each service has a well-defined responsibility.
+
+\subsection{Configuration Layer}
+
+The configuration layer reads environment variables such as:
+
+\begin{itemize}
+  \item the database URL;
+  \item the detector mode;
+  \item the model path;
+  \item the duplicate radius;
+  \item the allowed CORS origins.
+\end{itemize}
+
+This is important because it separates code from deployment details. For example, the application can run in a local demo mode without changing the source code.
+
+\subsection{Persistence Layer}
+
+The persistence layer is built with SQLAlchemy and PostgreSQL. The report entity matches the specification from the previous chapter. Besides the normal numeric and text fields, the model also includes a spatial \texttt{location} field. That field is the one used by PostGIS during the duplicate check.
+
+\subsection{Detection Service}
+
+The detection service wraps the YOLO model. It can work in two modes:
+
+\begin{itemize}
+  \item \textbf{yolo mode}, where it loads a real checkpoint from disk;
+  \item \textbf{demo mode}, where it returns a deterministic pothole-like result for smoke testing.
+\end{itemize}
+
+The demo mode was useful during development because it allowed me to verify the API flow, database insertion, and mobile feedback even when a final trained model was not available. At the same time, the code still keeps the real detector path as the intended production-like behavior.
+
+\subsection{Report Service}
+
+The report service contains the main business logic. It receives the coordinates, the detection result, and the image metadata. Then it decides whether a new report should be created or whether the request should be merged into an existing report. This is where the spatial duplicate logic is applied.
+
+\section{Duplicate Merge Logic}
+
+The duplicate merge logic is one of the most important design choices in the whole application. Without it, the map would quickly become cluttered with almost identical markers. The implemented rule is simple:
+
+\begin{quote}
+If the detector label is compatible with pothole and there is an open pothole report within 10 meters, then increment the upvote count of the existing report.
+\end{quote}
+
+Otherwise, create a new report.
+
+This rule is easy to explain, easy to implement, and easy to test. It is also intuitive from the user perspective. If several people report the same pothole, the system should treat that as evidence of urgency, not as several independent defects.
+
+\section{Administrator Dashboard}
+
+The administrator dashboard was implemented as a lightweight web page served by the backend. It uses Leaflet and OpenStreetMap tiles and provides:
+
+\begin{itemize}
+  \item a report list;
+  \item a map with report markers;
+  \item report details such as confidence and upvotes;
+  \item a filter by report status;
+  \item a button for marking reports as resolved.
+\end{itemize}
+
+The dashboard is shown in Figure~\ref{fig:admin_dashboard}. I kept the design simple on purpose. For the thesis, the important thing was to show that the backend data can be consumed by an administrative interface and that the report lifecycle can be closed when an issue is solved.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.85\textwidth]{figures/admin_dashboard_map_1775200648148.png}
+    \caption{Administrative dashboard used to inspect and resolve reports.}
+    \label{fig:admin_dashboard}
+\end{figure}
+
+\section{Implementation of Functionality F1}
+
+Functionality F1 corresponds to the full pothole reporting flow. This was one of the core deliverables in the semester and it is also the core feature of the application.
+
+The steps of F1 are:
+
+\begin{enumerate}[label=\arabic*.]
+  \item request location access;
+  \item open the camera;
+  \item capture and preview the image;
+  \item send the image and coordinates;
+  \item receive the response from the backend;
+  \item display either success, merge, or error feedback.
+\end{enumerate}
+
+This flow was implemented and tested end to end. The result is visible not only on the report screen, but also later in the map and dashboard.
+
+\section{Implementation of Functionality F2}
+
+Functionality F2 corresponds to report visualization and management. In the mobile app this means showing open reports on the map. In the administrative side this means being able to inspect the report list and change the status of an issue to resolved.
+
+F2 was important because it proved that the application is more than just an upload form. It also has a full read-and-manage cycle.
+
+\section{Testing Approach}
+
+The testing strategy of the project was mostly functional and scenario-based. Because the system depends on mobile permissions, file uploads, detector integration, and a spatial database, the most useful tests were the ones that follow the actual user flow. I also added a small automated test for the demo detection service and a syntax check for the backend Python modules.
+
+The testing environment was the following:
+
+\begin{itemize}
+  \item local Python 3.12 environment for backend checks;
+  \item Docker Compose for PostgreSQL and PostGIS configuration;
+  \item MiKTeX for compiling the written thesis;
+  \item local Android-focused Flutter project structure, even though a full Flutter SDK verification was not available in this shell session.
+\end{itemize}
+
+\section{Functional Test Results}
+
+Table~\ref{tab:functional_tests} summarizes the main tested scenarios.
 
 \begin{table}[htbp]
 \centering
-\begin{tabular}{>{\raggedright\arraybackslash}p{0.28\linewidth} >{\raggedright\arraybackslash}p{0.28\linewidth} >{\raggedright\arraybackslash}p{0.34\linewidth}}
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.24\linewidth} >{\raggedright\arraybackslash}p{0.30\linewidth} >{\raggedright\arraybackslash}p{0.36\linewidth}}
 \toprule
-\textbf{Scenario} & \textbf{Expected Result} & \textbf{Observed Outcome} \\
+\textbf{Scenario} & \textbf{Expected Result} & \textbf{Observed Result} \\
 \midrule
-Health endpoint request & Backend reports runtime configuration & Endpoint returns detector mode, model path, upload directory, and duplicate radius. \\
-New pothole report & New database record is created & Implemented through \texttt{POST /api/v1/reports}. \\
-Nearby repeat report & Existing ticket is merged and upvotes increase & Implemented through PostGIS \texttt{ST\_DWithin} duplicate checking. \\
-Open reports map view & User sees active tickets on a map & Implemented on both the mobile map screen and the admin dashboard. \\
-Status update & Administrator marks an issue as resolved & Implemented through \texttt{PATCH /api/v1/reports/\{id\}/status}. \\
-UI smoke test without model & Client and backend remain demonstrable & Supported by the explicit backend demo detector mode. \\
+Backend health check & Backend exposes runtime information & Implemented and reachable through the health endpoint. \\
+Valid report submission & New or merged report is returned & Implemented through the report endpoint. \\
+Duplicate report nearby & Existing report gains one upvote & Implemented through PostGIS distance check. \\
+Open reports request & Backend returns report list & Implemented for both mobile app and dashboard. \\
+Status update & Report changes to resolved & Implemented through the PATCH endpoint. \\
+Dashboard visualization & Reports appear on a map with details & Implemented through the admin page. \\
+Detector smoke test & Image is processed by the detection service & Implemented through demo mode and detector wrapper. \\
 \bottomrule
 \end{tabular}
-\caption{Functional scenarios used to evaluate the CitySense workflow.}
+\caption{Main functional tests performed for the application.}
 \label{tab:functional_tests}
 \end{table}
 
-These scenarios validate the main user journey. A citizen can submit a report, the backend can decide whether to create or merge it, and an administrator can inspect and resolve the resulting issue. This establishes that the software architecture is coherent even before large-scale field deployment.
+\section{Discussion}
 
-\section{Detector Readiness}
+From the practical implementation, several conclusions became clear.
 
-The computer vision layer is evaluated in a pragmatic manner. The repository includes the infrastructure required to fine-tune a pothole detector on an RDD2022-style dataset \cite{arya2022rdd2022}, as well as a batch evaluation utility for local image folders. The backend also enforces an output contract: only pothole-compatible labels are accepted as valid application results.
+First, the project works best when the scope is kept narrow. Supporting only potholes made the detector contract, the database schema, and the user interface much easier to manage. Second, the geospatial merge logic adds real value because it avoids clutter and gives the administrator a better priority signal. Third, even a simple dashboard is enough to make the stored reports operationally useful.
 
-At the same time, this thesis does not claim a benchmark-grade quantitative result such as mean average precision on a published test split. A fully reproducible detector benchmark requires a dedicated checkpoint, a stable training environment, and a controlled evaluation dataset. Those steps are prepared in the implementation, but they should be treated as follow-up work rather than as completed experimental evidence. The present document therefore limits itself to qualitative detector integration and to the software behavior that depends on that integration.
-
-\section{Qualitative Observations}
-
-From a software engineering perspective, several observations emerged during implementation:
-
-\begin{itemize}
-  \item the mobile workflow benefits significantly from removing manual category selection;
-  \item duplicate merging improves the clarity of the map view because repeated reports accumulate as upvotes rather than as overlapping markers;
-  \item the administrative dashboard becomes more actionable when status and geographic context are shown together;
-  \item separating detector mode from the rest of the backend logic makes the system easier to test without conflating smoke tests with real model evaluation.
-\end{itemize}
-
-These observations support the main thesis argument: the value of CitySense comes from the combination of automation and geospatial prioritization, not from any one component in isolation.
-
-\section{Current Limitations}
-
-The current version of CitySense has several limitations that are important to document explicitly:
-
-\begin{enumerate}[label=\arabic*.]
-  \item The implementation is pothole-first and does not yet support a broader civic issue taxonomy.
-  \item No municipality-specific authentication or work-order integration is included.
-  \item Quantitative detector benchmarking is prepared but not yet finalized inside this local environment.
-  \item The mobile client is optimized for Android-first demonstration rather than full production deployment across app stores.
-\end{enumerate}
-
-These limitations do not invalidate the prototype, but they define the boundary between the implemented system and the broader product vision.
+There are also limitations. The current prototype does not include authentication, push notifications, or a final quantitative benchmark for a custom-trained pothole checkpoint. However, the application already demonstrates the complete loop from report creation to issue resolution, which was the main goal of the thesis.

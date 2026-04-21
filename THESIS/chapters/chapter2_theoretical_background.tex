@@ -1,35 +1,92 @@
 \chapter{Theoretical Background}
 
-CitySense combines mobile computing, backend web services, computer vision, and geographic information systems. This chapter summarizes the concepts that are most relevant to the implementation.
+This chapter contains the first theoretical part of the thesis. The goal here is not to describe every technology in full detail, but to explain the concepts that were necessary for building the application. Since CitySense is a full-stack project, the theoretical background has to cover several areas: mobile development, web services, computer vision, and spatial data processing.
 
-\section{Cross-Platform Mobile Development with Flutter}
+\section{Mobile Development for Citizen Reporting Applications}
 
-Flutter is a cross-platform UI toolkit that enables the development of mobile applications from a single Dart codebase \cite{flutter_docs}. Instead of relying on a bridge to native widgets, Flutter renders its own widget tree, which makes the visual layer consistent across platforms. For a project like CitySense, this is useful because the interaction is strongly guided by a small set of reusable screens: a camera-driven reporting view, a map view, and status feedback components.
+The first important topic is mobile development. In this type of application the phone is the main interface between the citizen and the system. Because of that, the application has to be simple, responsive, and able to access hardware components such as the camera and GPS sensor.
 
-Another relevant feature is Flutter's plugin ecosystem. Access to the device camera and location sensors is exposed through packages that wrap platform-specific behavior behind a single interface. This makes it possible to build an Android-first prototype without writing a separate Kotlin application from scratch, while still preserving the possibility of extending the same client to iOS later.
+For this project I chose Flutter \cite{flutter_docs}. Flutter allows the developer to write one codebase in Dart and compile it to multiple platforms. Even though the current version of CitySense is Android-first, using Flutter was still a good choice because it reduced development time and kept the user interface code organized. Another advantage is that the framework already has mature packages for camera access, maps, geolocation, and HTTP communication.
 
-\section{Python APIs with FastAPI}
+From a software engineering point of view, Flutter is also convenient because it encourages a component-based user interface. The interface is built from widgets, and each widget has a specific role. In CitySense, this was useful when separating the report flow from the map flow. One screen is responsible for taking the photo and submitting the report, while another screen is responsible for showing already reported issues.
 
-FastAPI is a Python web framework designed around asynchronous request handling, automatic request validation, and concise API definitions \cite{fastapi_docs}. It is well suited to CitySense because the backend requirements are clear and structured: accept multipart form uploads, validate coordinates, expose JSON report data, and render an administrative HTML page.
+\subsection{Android-First Constraints}
 
-The framework also integrates naturally with Pydantic-based schemas, which is helpful when the same data model must be used consistently across multiple endpoints. In CitySense, the backend exposes health, report submission, report listing, and status update endpoints. Each endpoint benefits from explicit request and response schemas because the mobile client and the dashboard depend on predictable field names and types.
+Even if Flutter is cross-platform, the thesis focuses on Android. This decision was made for practical reasons. Android testing is easier to perform in the current environment, Android devices are common among target users, and it is simpler to demonstrate camera permissions, GPS permissions, and local backend integration on Android. In other words, the project still uses a cross-platform framework, but the delivery target is intentionally narrow.
 
-\section{Object Detection and YOLO-Based Inference}
+\subsection{Importance of User Friction}
 
-Object detection differs from image classification in that it must identify both the class of an object and its approximate position in the image. The original YOLO formulation reframed detection as a single-stage regression problem, allowing the network to predict classes and bounding boxes in one pass \cite{redmon2016yolo}. This approach made it possible to trade some complexity in favor of real-time or near-real-time inference.
+Citizen reporting applications usually fail when they ask too much from the user. If a person has to type a long description, choose a category from a long list, and manually indicate the exact location, then the number of successful reports drops. Because of that, a good mobile reporting application should ask only for the data that the user can provide quickly and should automate the rest. This idea directly influenced the design of CitySense: the only important action for the user is to take a relevant photo.
 
-The implementation used in this project is based on Ultralytics YOLO \cite{jocher2023ultralytics}. In practical terms, the detector receives an image and returns one or more bounding boxes with associated classes and confidence scores. For CitySense, the backend accepts only pothole-related labels as valid output. This normalization step is important because a general-purpose detector may return classes that are outside the scope of the application. The system therefore treats the detector not as a free-form classifier but as a bounded service with a clearly defined output contract.
+\section{REST APIs and Backend Services}
 
-\section{Spatial Data and PostGIS}
+The second theoretical topic is backend communication. The mobile app does not store the reports locally as the main source of truth. Instead, it sends them to a backend service. This is a common client-server architecture, where the mobile app is responsible for collecting input, and the backend is responsible for validation, persistence, and business logic.
 
-PostgreSQL is a relational database system with strong support for transactional integrity, indexing, and structured queries \cite{postgres_docs}. PostGIS extends PostgreSQL with spatial types and spatial functions, which makes it possible to store locations as geographic objects and query them by distance \cite{obe2021postgis}. This is essential for CitySense because duplicate detection is fundamentally a spatial problem.
+FastAPI \cite{fastapi_docs} was chosen as the backend framework because it is lightweight, expressive, and well suited for JSON-based APIs. It supports request validation through schemas, integrates cleanly with Python code, and is easy to document. For CitySense, this matters because the endpoints are few but important:
 
-The core function used in the implementation is \texttt{ST\_DWithin}. Given two geographic points and a distance threshold, this function checks whether the points are within that threshold. By storing each report as a point geometry and using a fixed radius, the backend can decide whether a new pothole report should become a fresh ticket or an upvote on an existing one. This is more robust than comparing latitude and longitude directly because it treats geographic distance as the real business rule.
+\begin{itemize}
+  \item an endpoint for the health status of the backend;
+  \item an endpoint for sending a report with image and coordinates;
+  \item an endpoint for listing reports;
+  \item an endpoint for changing the status of a report.
+\end{itemize}
 
-\section{Map Rendering with OpenStreetMap and Leaflet}
+The backend also has to deal with multipart uploads because the mobile app sends image files, not only JSON text. This is another reason why a clear REST framework is useful. The backend can validate types, return informative errors, and expose a consistent response structure to both the mobile client and the admin dashboard.
 
-An administrator-facing map is useful only if it provides geographic context and remains easy to interpret. CitySense uses OpenStreetMap tiles as the geographic base layer \cite{openstreetmap}. The web dashboard uses Leaflet for browser-based map rendering \cite{leaflet_docs}, while the mobile client uses Flutter map rendering components built on the same OpenStreetMap tile model. The shared map foundation ensures that administrators and citizens interpret issue locations in a consistent geographic frame.
+\subsection{Separation of Concerns}
+
+In a project of this size, separation of concerns is important. The detection logic should not be mixed directly with the database model, and the API routes should not contain all of the business logic in one place. The current implementation follows this principle by separating configuration, persistence, detection, storage, and reporting services. This makes the code easier to test and also makes the thesis easier to explain.
+
+\section{Object Detection with YOLO}
+
+The computer vision component of the thesis is based on object detection. Unlike image classification, which only says what is present in an image, object detection also estimates where the object is located. This is useful for road-damage analysis because the system should not only say that a photo is related to a pothole, but also identify the relevant region in the image.
+
+The original YOLO family became popular because it treats detection as a single-stage task \cite{redmon2016yolo}. Instead of generating regions first and classifying them later, the model predicts classes and bounding boxes in one forward pass. This makes YOLO practical for real-time or near-real-time scenarios.
+
+The implementation in CitySense uses Ultralytics YOLO \cite{jocher2023ultralytics}. In simplified terms, the detector returns three important things:
+
+\begin{enumerate}[label=\arabic*.]
+  \item a class label;
+  \item a confidence score;
+  \item the coordinates of a predicted bounding box.
+\end{enumerate}
+
+For the application, the label space is intentionally restricted. The backend accepts only pothole-like labels as valid output. This is important because the project is not intended to be a general visual recognition system. It is a specialized reporting application. Restricting the label space makes the system easier to reason about and reduces the risk of meaningless outputs being shown to the user.
+
+\subsection{Why a Lightweight Model Matters}
+
+Model complexity is always a trade-off. A larger model may achieve better accuracy, but it also requires more resources and usually takes more time to run. For a student project that needs to be demonstrable on limited hardware, a smaller YOLO variant is a practical compromise. It allows the backend to remain responsive while still supporting the thesis goal of automatic issue labeling.
+
+\subsection{Confidence Thresholds}
+
+Another practical concept is the confidence threshold. A detector usually returns several predictions, but not all of them are equally reliable. The confidence threshold allows the application to reject weak predictions. In CitySense this is relevant because false positives would create noisy reports and reduce trust in the system.
+
+\section{Spatial Databases and Geographical Queries}
+
+PostgreSQL is widely used for structured relational data \cite{postgres_docs}. For CitySense, however, standard relational columns are not enough because location is central to the business logic. The project therefore uses PostGIS \cite{obe2021postgis}, which extends PostgreSQL with spatial types and spatial functions.
+
+The key idea is that a location should not be treated only as two unrelated numbers. If latitude and longitude are stored as a true geographic point, then the database can answer questions such as:
+
+\begin{itemize}
+  \item Is there an open issue near this position?
+  \item How far apart are two reports?
+  \item Which reports fall inside a selected area?
+\end{itemize}
+
+This is what makes duplicate merging possible. The backend creates a point from the incoming GPS coordinates and compares it to the points of already stored reports.
+
+\subsection{Distance-Based Duplicate Detection}
+
+The function used in CitySense is \texttt{ST\_DWithin}. This function checks whether two geometries are within a given distance. In this project the distance threshold is 10 meters. The practical meaning is simple: if two pothole reports are close enough and refer to the same issue type, then they most likely describe the same real-world defect.
+
+This design is better than exact coordinate matching. Two users standing on different sides of the same pothole will not send identical coordinates, but their points will still fall within a small radius. Because of that, spatial comparison is more realistic than direct numeric equality.
+
+\section{Map-Based Visualization}
+
+The last theoretical topic in this chapter is map visualization. A pothole report without geographic context is not very useful. Administrators need to know where the issue is located, and users benefit from seeing whether a problem has already been reported.
+
+CitySense uses OpenStreetMap as the geographic base layer \cite{openstreetmap}. On the web side, the map is rendered with Leaflet \cite{leaflet_docs}. On the mobile side, Flutter map widgets are used to display the same kind of tile-based geographic information. The advantage of this approach is that the whole system shares a common visual model of the city map.
 
 \section{Summary}
 
-The theoretical foundation of CitySense can therefore be summarized as follows: Flutter provides the mobile interaction layer, FastAPI structures the HTTP API, YOLO enables pothole-oriented image analysis, and PostGIS supplies the spatial operators required for duplicate merging. The implementation chapter builds directly on these concepts.
+The first theoretical chapter covered the technical ideas that are directly used in the implementation: a mobile client that reduces user friction, a REST backend that centralizes logic, an object detector that provides automatic pothole labeling, a spatial database that supports geographic duplicate detection, and a map-based user interface that keeps reports understandable. These concepts form the technical basis for the next chapter, where I discuss existing solutions and the decisions made for this project.

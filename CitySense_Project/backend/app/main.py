@@ -158,8 +158,9 @@ def patch_report_status(
 @app.get("/admin", response_class=HTMLResponse)
 def admin_dashboard(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(
-        "admin.html",
-        {
+        request=request,
+        name="admin.html",
+        context={
             "request": request,
             "api_prefix": settings.api_prefix,
             "detector_mode": settings.detector_mode,

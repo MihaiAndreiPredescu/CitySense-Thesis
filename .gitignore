@@ -21,6 +21,7 @@ htmlcov/
 .venv/
 venv/
 CitySense_Project/backend/.env
+CitySense_Project/backend/.env.txt
 CitySense_Project/backend/venv/
 CitySense_Project/backend/data/uploads/
 CitySense_Project/backend/data/models/*.pt

@@ -27,6 +27,43 @@ The flow between these components is the following:
 
 This architecture was chosen because it keeps heavy logic out of the phone and makes the backend the single source of truth.
 
+\section{Deployment with Docker Compose}
+
+The backend side of CitySense is run through Docker Compose \cite{docker_compose_docs}. For this project, Docker Compose has the role of starting the services that must work together for the application to function. Instead of manually installing and configuring a database server, PostGIS extensions, Python dependencies, environment variables, and ports, the project describes the local backend environment in one configuration file.
+
+The Compose file defines two services, summarized in Table~\ref{tab:docker_compose_services}.
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.18\linewidth} >{\raggedright\arraybackslash}p{0.30\linewidth} >{\raggedright\arraybackslash}p{0.40\linewidth}}
+\toprule
+\textbf{Service} & \textbf{Technology} & \textbf{Role in CitySense} \\
+\midrule
+\texttt{db} & PostgreSQL with PostGIS & Stores reports, locations, status values, confidence scores, image paths, and upvote counts. The PostGIS extension supports distance-based duplicate checks. \\
+\texttt{backend} & FastAPI application in a Python container & Receives reports from the mobile app, stores uploaded images, runs the detector, performs duplicate logic, exposes REST endpoints, and serves the admin dashboard. \\
+\bottomrule
+\end{tabular}
+\caption{Docker Compose services used by the CitySense backend.}
+\label{tab:docker_compose_services}
+\end{table}
+
+The database service uses the public \texttt{postgis/postgis} image, while the backend service is built from the project's Dockerfile. The backend depends on the database health check, which means that it starts only after PostgreSQL is ready to accept connections. This matters because the backend initializes and queries the database during normal operation.
+
+The port mapping \texttt{8000:8000} makes the FastAPI application available through port 8000 on localhost. This is the address used for the admin dashboard during local testing. The port mapping \texttt{5432:5432} exposes the database for local inspection and debugging. Compose also defines persistent storage for the database through a named volume and maps the local model and upload folders into the backend container. Because of that, uploaded images and trained detector weights remain available outside the container lifecycle.
+
+Inside the Compose network, the backend connects to the database using the service name \texttt{db}, not \texttt{localhost}. This is why the database URL contains \texttt{@db:5432}. In simple terms, Docker Compose creates a private local network where the containers can find each other by service name.
+
+For development and demonstration, the main commands are:
+
+\begin{verbatim}
+docker compose up --build
+docker compose up -d
+docker compose logs backend
+docker compose down
+\end{verbatim}
+
+This deployment model is suitable for the thesis because it makes the backend reproducible. A reviewer or developer does not need to manually reconstruct the backend environment; the required services and their relationships are documented in the Compose file.
+
 \section{Design of the Mobile Application}
 
 The mobile application was designed around two screens, because this was enough to cover the main use cases and kept the interface easy to understand.
@@ -101,6 +138,63 @@ The detection service wraps the YOLO model. It can work in two modes:
 
 The demo mode was useful during development because it allowed me to verify the API flow, database insertion, and mobile feedback even when a final trained model was not available. At the same time, the code still keeps the real detector path as the intended production-like behavior.
 
+\subsection{YOLOv8 Dataset and Training Workflow}
+
+The real detection mode requires a checkpoint trained for pothole detection. A general YOLOv8 checkpoint such as \texttt{yolov8n.pt} is useful as a starting point, but it is not sufficient by itself because it is not specialized for the pothole class used by CitySense. The model must either be trained on a pothole dataset or replaced by an existing pothole-specific checkpoint.
+
+The intended dataset format is the standard YOLO detection layout \cite{jocher2023ultralytics}. A suitable export contains training images, validation images, label files with bounding boxes, and a \texttt{data.yaml} file. The class name must be consistent with the backend detector contract. In this project, the expected class is \texttt{pothole}. This is important because the backend accepts only labels that normalize to a pothole label.
+
+The dataset structure expected by the training script is:
+
+\begin{verbatim}
+pothole_dataset/
+  images/
+    train/
+    val/
+  labels/
+    train/
+    val/
+  data.yaml
+\end{verbatim}
+
+An example \texttt{data.yaml} file is:
+
+\begin{verbatim}
+path: C:/datasets/pothole_dataset
+train: images/train
+val: images/val
+
+names:
+  0: pothole
+\end{verbatim}
+
+For this project, a practical dataset source is Roboflow Universe \cite{roboflow_universe}, because it can export object-detection datasets directly in YOLOv8 format. A dataset should be selected only if it has clear pothole bounding boxes and a clean class list. Datasets that contain several inconsistent labels for the same concept, such as \texttt{Pothole}, \texttt{potholes}, \texttt{object}, or numeric placeholder labels, should be cleaned before training.
+
+The repository contains a training utility that fine-tunes a YOLOv8 model and copies the best checkpoint to the location used by the backend:
+
+\begin{verbatim}
+cd C:\UBB\THESIS\CitySense_Project\backend
+python scripts/train_pothole_detector.py ^
+  --data C:\datasets\pothole_dataset\data.yaml ^
+  --epochs 50 ^
+  --imgsz 640
+\end{verbatim}
+
+After training, the script copies the best model to:
+
+\begin{verbatim}
+CitySense_Project/backend/data/models/pothole_yolov8n.pt
+\end{verbatim}
+
+The backend then uses the checkpoint when the detector mode is set to YOLO:
+
+\begin{verbatim}
+DETECTOR_MODE=yolo
+MODEL_PATH=/app/data/models/pothole_yolov8n.pt
+\end{verbatim}
+
+The mobile application does not run the model directly. It only sends the image and location to the backend. This keeps the phone application lighter and makes it possible to update or replace the model without reinstalling the mobile app.
+
 \subsection{Report Service}
 
 The report service contains the main business logic. It receives the coordinates, the detection result, and the image metadata. Then it decides whether a new report should be created or whether the request should be merged into an existing report. This is where the spatial duplicate logic is applied.
@@ -163,16 +257,59 @@ F2 was important because it proved that the application is more than just an upl
 
 \section{Testing Approach}
 
-The testing strategy of the project was mostly functional and scenario-based. Because the system depends on mobile permissions, file uploads, detector integration, and a spatial database, the most useful tests were the ones that follow the actual user flow. I also added a small automated test for the demo detection service and a syntax check for the backend Python modules.
+The testing strategy of the project was mostly functional and scenario-based. Because the system depends on mobile permissions, file uploads, detector integration, containerized services, and a spatial database, the most useful tests were the ones that follow the actual user flow. I also added a small automated test for the demo detection service and a backend test run inside the Docker container.
 
 The testing environment was the following:
 
 \begin{itemize}
-  \item local Python 3.12 environment for backend checks;
-  \item Docker Compose for PostgreSQL and PostGIS configuration;
+  \item Docker Compose for PostgreSQL, PostGIS, and backend execution;
   \item MiKTeX for compiling the written thesis;
-  \item local Android-focused Flutter project structure, even though a full Flutter SDK verification was not available in this shell session.
+  \item Android emulator execution for the Flutter mobile application;
+  \item Chrome execution for web-oriented smoke tests during development.
 \end{itemize}
+
+\section{Detector Evaluation Protocol}
+
+Because the YOLO component can be used in both demo mode and real checkpoint mode, the evaluation must separate functional integration from model quality. Functional integration asks whether the backend can receive an image, call the detector wrapper, and continue the reporting workflow. Model quality asks whether a trained checkpoint actually detects potholes accurately on unseen images.
+
+For a final trained checkpoint, the recommended evaluation procedure is:
+
+\begin{enumerate}[label=\arabic*.]
+  \item keep a validation or test folder separate from the training images;
+  \item run the trained model on that folder using the evaluation script or the Ultralytics validation command;
+  \item report precision, recall, \texttt{mAP@0.5}, and \texttt{mAP@0.5:0.95};
+  \item inspect several correct detections, false positives, and false negatives;
+  \item choose a confidence threshold that balances missed potholes against false reports.
+\end{enumerate}
+
+The repository also contains a batch inference script for project-level evaluation:
+
+\begin{verbatim}
+cd C:\UBB\THESIS\CitySense_Project\backend
+python scripts/evaluate_detector.py ^
+  --images C:\datasets\pothole_eval_images ^
+  --output evaluation_results.json
+\end{verbatim}
+
+This script records, for each image, whether a pothole was detected, the confidence score, and the predicted bounding box. The resulting JSON file can then be summarized in the thesis or used to manually inspect mistakes.
+
+Table~\ref{tab:detector_evaluation_status} distinguishes the detector-related checks that are already covered by the prototype from the benchmark that should be completed after training a final checkpoint.
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.26\linewidth} >{\raggedright\arraybackslash}p{0.34\linewidth} >{\raggedright\arraybackslash}p{0.30\linewidth}}
+\toprule
+\textbf{Check} & \textbf{Purpose} & \textbf{Current status} \\
+\midrule
+Detector wrapper smoke test & Verifies that the backend detection service returns a pothole-shaped response and bounding box. & Covered by automated backend tests in demo mode. \\
+End-to-end report flow & Verifies that image upload, detection, database storage, and map/dashboard visualization work together. & Covered by functional application testing. \\
+YOLO checkpoint loading & Verifies that \texttt{DETECTOR\_MODE=yolo} loads \texttt{pothole\_yolov8n.pt} from the model folder. & Supported by implementation; depends on providing a trained checkpoint. \\
+Quantitative model benchmark & Measures real detector quality on unseen pothole images. & To be completed after the final dataset and checkpoint are fixed. \\
+\bottomrule
+\end{tabular}
+\caption{Detector evaluation coverage and remaining benchmark work.}
+\label{tab:detector_evaluation_status}
+\end{table}
 
 \section{Functional Test Results}
 
@@ -190,7 +327,7 @@ Duplicate report nearby & Existing report gains one upvote & Implemented through
 Open reports request & Backend returns report list & Implemented for both mobile app and dashboard. \\
 Status update & Report changes to resolved & Implemented through the PATCH endpoint. \\
 Dashboard visualization & Reports appear on a map with details & Implemented through the admin page. \\
-Detector smoke test & Image is processed by the detection service & Implemented through demo mode and detector wrapper. \\
+Detector smoke test & Image is processed by the detection service & Passed through demo mode and detector wrapper tests. \\
 \bottomrule
 \end{tabular}
 \caption{Main functional tests performed for the application.}
@@ -203,4 +340,4 @@ From the practical implementation, several conclusions became clear.
 
 First, the project works best when the scope is kept narrow. Supporting only potholes made the detector contract, the database schema, and the user interface much easier to manage. Second, the geospatial merge logic adds real value because it avoids clutter and gives the administrator a better priority signal. Third, even a simple dashboard is enough to make the stored reports operationally useful.
 
-There are also limitations. The current prototype does not include authentication, push notifications, or a final quantitative benchmark for a custom-trained pothole checkpoint. However, the application already demonstrates the complete loop from report creation to issue resolution, which was the main goal of the thesis.
+There are also limitations. The current prototype does not include authentication, push notifications, or a final quantitative benchmark for a custom-trained pothole checkpoint. However, the thesis now defines the training and evaluation path needed for that checkpoint, and the application already demonstrates the complete loop from report creation to issue resolution, which was the main goal of the project.

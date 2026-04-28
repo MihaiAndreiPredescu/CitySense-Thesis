@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID
 
@@ -59,10 +60,12 @@ def upsert_detected_report(
 
     if existing_report is not None:
         existing_report.upvotes += 1
+        existing_report.last_photo_reported_at = datetime.now(UTC)
         db.commit()
         db.refresh(existing_report)
         return ReportMutationResult(report=existing_report, deduped=True)
 
+    now = datetime.now(UTC)
     new_report = Report(
         issue_type=detection.issue_type,
         confidence=detection.confidence,
@@ -72,6 +75,7 @@ def upsert_detected_report(
         image_path=image_filename,
         status=ReportStatus.OPEN.value,
         upvotes=1,
+        last_photo_reported_at=now,
     )
 
     db.add(new_report)
@@ -110,6 +114,7 @@ def to_report_read(report: Report, settings: Settings) -> ReportRead:
         image_url=image_url,
         status=ReportStatus(report.status),
         upvotes=report.upvotes,
+        last_photo_reported_at=report.last_photo_reported_at,
         created_at=report.created_at,
         updated_at=report.updated_at,
     )

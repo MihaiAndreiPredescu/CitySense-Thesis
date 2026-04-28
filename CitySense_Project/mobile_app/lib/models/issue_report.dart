@@ -9,6 +9,7 @@ class IssueReport {
     required this.longitude,
     required this.status,
     required this.upvotes,
+    required this.lastPhotoReportedAt,
     required this.createdAt,
     required this.updatedAt,
     this.imagePath,
@@ -24,10 +25,16 @@ class IssueReport {
   final String? imageUrl;
   final ReportStatus status;
   final int upvotes;
+  final DateTime lastPhotoReportedAt;
   final DateTime createdAt;
   final DateTime updatedAt;
 
   factory IssueReport.fromJson(Map<String, dynamic> json) {
+    final lastPhotoReportedAt =
+        json['last_photo_reported_at'] ??
+        json['updated_at'] ??
+        json['created_at'];
+
     return IssueReport(
       id: json['id'] as String,
       issueType: json['issue_type'] as String,
@@ -38,6 +45,7 @@ class IssueReport {
       imageUrl: json['image_url'] as String?,
       status: ReportStatus.fromApiValue(json['status'] as String),
       upvotes: json['upvotes'] as int,
+      lastPhotoReportedAt: DateTime.parse(lastPhotoReportedAt as String),
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
     );

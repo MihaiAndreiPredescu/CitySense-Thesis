@@ -10,10 +10,7 @@ import '../services/location_service.dart';
 import '../widgets/report_status_card.dart';
 
 class ReportScreen extends StatefulWidget {
-  const ReportScreen({
-    required this.apiClient,
-    super.key,
-  });
+  const ReportScreen({required this.apiClient, super.key});
 
   final CitySenseApiClient apiClient;
 
@@ -80,15 +77,21 @@ class _ReportScreenState extends State<ReportScreen> {
     }
   }
 
+  String _formatDateTime(DateTime value) {
+    final local = value.toLocal();
+    String twoDigits(int number) => number.toString().padLeft(2, '0');
+
+    return '${local.year}-${twoDigits(local.month)}-${twoDigits(local.day)} '
+        '${twoDigits(local.hour)}:${twoDigits(local.minute)}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final result = _lastSubmission;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('CitySense'),
-      ),
+      appBar: AppBar(title: const Text('CitySense')),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
@@ -140,20 +143,26 @@ class _ReportScreenState extends State<ReportScreen> {
                 icon: result == null
                     ? Icons.route_outlined
                     : result.deduped
-                        ? Icons.merge_type
-                        : Icons.check_circle_outline,
+                    ? Icons.merge_type
+                    : Icons.check_circle_outline,
                 tint: result == null
                     ? theme.colorScheme.primary
                     : result.deduped
-                        ? const Color(0xFFB45C1A)
-                        : const Color(0xFF3C7F5B),
+                    ? const Color(0xFFB45C1A)
+                    : const Color(0xFF3C7F5B),
               ),
               if (result != null) ...[
                 const SizedBox(height: 16),
                 ReportStatusCard(
                   title: 'Report metadata',
                   message:
-                      'Issue type: ${result.report.issueType}\nConfidence: ${(result.report.confidence * 100).toStringAsFixed(1)}%\nUpvotes: ${result.report.upvotes}\nStatus: ${result.report.status.label}',
+                      'Issue type: ${result.report.issueType}'
+                      '\nConfidence: '
+                      '${(result.report.confidence * 100).toStringAsFixed(1)}%'
+                      '\nUpvotes: ${result.report.upvotes}'
+                      '\nStatus: ${result.report.status.label}'
+                      '\nDate and time the last photo report was taken: '
+                      '${_formatDateTime(result.report.lastPhotoReportedAt)}',
                   icon: Icons.analytics_outlined,
                 ),
               ],
@@ -169,7 +178,9 @@ class _ReportScreenState extends State<ReportScreen> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.camera_alt),
-                  label: Text(_isSubmitting ? 'Submitting...' : 'Capture & submit'),
+                  label: Text(
+                    _isSubmitting ? 'Submitting...' : 'Capture & submit',
+                  ),
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 18),
                   ),

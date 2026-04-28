@@ -65,8 +65,8 @@ FR4 & The backend must run a pothole-oriented detection step and reject unsuppor
 FR5 & The backend must store reports in a database together with their location, status, confidence, and metadata. \\
 FR6 & The backend must detect whether a report is a duplicate of an already open pothole within a radius of 10 meters. \\
 FR7 & If a duplicate exists, the backend must merge the report by incrementing the upvote count instead of inserting a new row. \\
-FR8 & The mobile application must provide a map view for open reports. \\
-FR9 & The administrative dashboard must show stored reports on a map together with metadata such as status and upvotes. \\
+FR8 & The mobile application must provide a map view for open reports and show a centered detail dialog when a marker is selected. \\
+FR9 & The administrative dashboard must show stored reports on a map together with metadata such as status, upvotes, and the date and time of the last photo report. \\
 FR10 & The administrative dashboard must allow the administrator to mark a report as resolved. \\
 \bottomrule
 \caption{Functional requirements of the CitySense system.}
@@ -139,7 +139,7 @@ These two functionalities are sufficient for showing the main idea of the projec
   \item The user opens the map screen.
   \item The app requests the list of open reports from the backend.
   \item The reports are rendered as map markers.
-  \item The user taps a marker to inspect details.
+  \item The user taps a marker to inspect details, including confidence, status, upvotes, coordinates, and the date and time when the last photo report was taken.
 \end{enumerate}
 
 \textbf{Postcondition:} The user understands where active pothole reports are located.
@@ -164,7 +164,7 @@ At the center of the system there is one main entity: the report. The fields of 
 
 \begin{table}[htbp]
 \centering
-\begin{tabular}{>{\raggedright\arraybackslash}p{0.22\linewidth} >{\raggedright\arraybackslash}p{0.20\linewidth} >{\raggedright\arraybackslash}p{0.44\linewidth}}
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.30\linewidth} >{\raggedright\arraybackslash}p{0.24\linewidth} >{\raggedright\arraybackslash}p{0.32\linewidth}}
 \toprule
 \textbf{Field} & \textbf{Type} & \textbf{Purpose} \\
 \midrule
@@ -177,6 +177,7 @@ At the center of the system there is one main entity: the report. The fields of 
 \texttt{image\_path} & String & Relative path of the stored uploaded image. \\
 \texttt{status} & String & Current state: open or resolved. \\
 \texttt{upvotes} & Integer & Number of merged reports or supporting submissions. \\
+\texttt{last\_photo\_\allowbreak reported\_\allowbreak at} & DateTime & Date and time when the last photo report for this pothole was taken. \\
 \texttt{created\_at} & DateTime & Creation time. \\
 \texttt{updated\_at} & DateTime & Time of the last update. \\
 \bottomrule

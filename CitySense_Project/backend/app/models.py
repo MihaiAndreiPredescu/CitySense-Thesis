@@ -5,9 +5,9 @@ from datetime import datetime
 from enum import Enum
 
 from geoalchemy2 import Geography
-from sqlalchemy import DateTime, Float, Integer, String, func
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, func
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 class Base(DeclarativeBase):
@@ -43,6 +43,9 @@ class Report(Base):
     upvotes: Mapped[int] = mapped_column(
         Integer, nullable=False, default=1, server_default="1"
     )
+    captured_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
     last_photo_reported_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -55,3 +58,22 @@ class Report(Base):
         server_default=func.now(),
         onupdate=func.now(),
     )
+
+
+class ReportClientSubmission(Base):
+    __tablename__ = "report_client_submissions"
+
+    client_report_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True
+    )
+    report_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("reports.id"), nullable=False, index=True
+    )
+    deduped: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    report: Mapped[Report] = relationship()

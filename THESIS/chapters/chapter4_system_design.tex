@@ -36,7 +36,8 @@ The basic usage scenario of CitySense is straightforward:
   \item A citizen sees a pothole and opens the mobile app.
   \item The app requests camera and location permissions if necessary.
   \item The user takes a photo and confirms the submission.
-  \item The backend receives the image and coordinates.
+  \item The app stores the photo, coordinates, capture time, and a client-side report identifier locally.
+  \item If the backend is reachable, it receives the image and metadata immediately; otherwise, the report remains queued on the phone.
   \item The detector classifies the issue as a pothole or rejects the image.
   \item The database checks whether a nearby pothole was already reported.
   \item The system either creates a new report or increments the upvote counter of an existing one.
@@ -60,7 +61,7 @@ The functional requirements describe what the system must do. Table~\ref{tab:fun
 \endhead
 FR1 & The mobile application must allow the user to capture an image using the phone camera. \\
 FR2 & The mobile application must request and obtain the current geographic coordinates of the user before sending the report. \\
-FR3 & The backend must accept a multipart request that contains an image, a latitude, and a longitude. \\
+FR3 & The backend must accept a multipart request that contains an image, a latitude, a longitude, the original capture time, and an optional client report identifier. \\
 FR4 & The backend must run a pothole-oriented detection step and reject unsupported or empty detections. \\
 FR5 & The backend must store reports in a database together with their location, status, confidence, and metadata. \\
 FR6 & The backend must detect whether a report is a duplicate of an already open pothole within a radius of 10 meters. \\
@@ -68,6 +69,7 @@ FR7 & If a duplicate exists, the backend must merge the report by incrementing t
 FR8 & The mobile application must provide a map view for open reports and show a centered detail dialog when a marker is selected. \\
 FR9 & The administrative dashboard must show stored reports on a map together with metadata such as status, upvotes, and the date and time of the last photo report. \\
 FR10 & The administrative dashboard must allow the administrator to mark a report as resolved. \\
+FR11 & The mobile application must save reports locally when the backend is unreachable and synchronize them automatically when the backend becomes reachable again. \\
 \bottomrule
 \caption{Functional requirements of the CitySense system.}
 \label{tab:functional_requirements}
@@ -89,6 +91,7 @@ NFR3 & The backend should be modular enough to separate configuration, persisten
 NFR4 & The map view should remain understandable even when multiple users report the same pothole. \\
 NFR5 & The implementation should be easy to run locally for demonstration and thesis evaluation. \\
 NFR6 & The project should remain maintainable and easy to explain during the defense. \\
+NFR7 & Retrying an offline report should be idempotent, so the same client submission must not increase the duplicate counter more than once. \\
 \bottomrule
 \end{tabular}
 \caption{Non-functional requirements considered during implementation.}
@@ -123,12 +126,15 @@ These two functionalities are sufficient for showing the main idea of the projec
   \item The user taps the report button.
   \item The app requests location if needed.
   \item The user captures a pothole photo.
-  \item The app uploads the image and coordinates.
+  \item The app saves the image, coordinates, capture time, and client report identifier locally.
+  \item The app uploads the saved report if the backend is reachable.
   \item The backend processes the request.
   \item The user receives a success or error message.
 \end{enumerate}
 
 \textbf{Postcondition:} A new report is created or merged with an existing one.
+
+\textbf{Alternative flow:} If the backend cannot be reached, the local report remains in the offline queue. The application retries synchronization when connectivity changes or when the app is resumed. Once the backend is reachable on the configured network address, the queued report is sent using the same client report identifier.
 
 \subsection{Use Case 2: View Active Reports}
 
@@ -177,6 +183,7 @@ At the center of the system there is one main entity: the report. The fields of 
 \texttt{image\_path} & String & Relative path of the stored uploaded image. \\
 \texttt{status} & String & Current state: open or resolved. \\
 \texttt{upvotes} & Integer & Number of merged reports or supporting submissions. \\
+\texttt{captured\_at} & DateTime & Date and time when the first photo for this report was taken on the phone. \\
 \texttt{last\_photo\_\allowbreak reported\_\allowbreak at} & DateTime & Date and time when the last photo report for this pothole was taken. \\
 \texttt{created\_at} & DateTime & Creation time. \\
 \texttt{updated\_at} & DateTime & Time of the last update. \\
@@ -185,6 +192,8 @@ At the center of the system there is one main entity: the report. The fields of 
 \caption{Main data entity used by CitySense.}
 \label{tab:report_entity}
 \end{table}
+
+Offline synchronization also introduces a small receipt table, \texttt{report\_\allowbreak client\_\allowbreak submissions}. It stores the client-generated report UUID, the backend report to which it was applied, and whether that submission was merged as a duplicate. This table prevents an offline retry from incrementing the same pothole twice if the first upload succeeded but the phone did not receive the response.
 
 \section{API Specification}
 
@@ -197,7 +206,7 @@ The main backend endpoints used in the project are shown in Table~\ref{tab:api_e
 \textbf{Endpoint} & \textbf{Method} & \textbf{Role} \\
 \midrule
 \texttt{/api/v1/health} & GET & Returns the backend status and the active detector configuration. \\
-\texttt{/api/v1/reports} & POST & Creates or merges a pothole report from an image and coordinates. \\
+\texttt{/api/v1/reports} & POST & Creates or merges a pothole report from an image, coordinates, capture time, and optional client report identifier. \\
 \texttt{/api/v1/reports} & GET & Returns reports, usually filtered by status. \\
 \texttt{/api/v1/reports/\allowbreak\{reportId\}/status} & PATCH & Changes a report from open to resolved. \\
 \bottomrule

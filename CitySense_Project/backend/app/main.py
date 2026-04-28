@@ -1,9 +1,19 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from datetime import datetime
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi import (
+    Depends,
+    FastAPI,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -91,6 +101,8 @@ def healthcheck() -> HealthResponse:
 async def create_report(
     latitude: float = Form(...),
     longitude: float = Form(...),
+    captured_at: datetime | None = Form(default=None),
+    client_report_id: UUID | None = Form(default=None),
     image: UploadFile = File(...),
     db: Session = Depends(get_db),
 ) -> ReportSubmissionResponse:
@@ -119,9 +131,14 @@ async def create_report(
         longitude=longitude,
         detection=detection,
         image_filename=saved_path.name,
+        captured_at=captured_at,
+        client_report_id=client_report_id,
     )
 
-    if mutation.deduped:
+    if mutation.replayed:
+        safe_unlink(saved_path)
+        message = "Report was already synchronized earlier."
+    elif mutation.deduped:
         safe_unlink(saved_path)
         message = "Merged with an existing pothole report and increased its priority."
     else:
@@ -131,6 +148,8 @@ async def create_report(
         message=message,
         deduped=mutation.deduped,
         report=to_report_read(mutation.report, settings),
+        client_report_id=mutation.client_report_id,
+        replayed=mutation.replayed,
     )
 
 
@@ -143,7 +162,10 @@ def get_reports(
     return [to_report_read(report, settings) for report in reports]
 
 
-@app.patch(f"{settings.api_prefix}/reports/{{report_id}}/status", response_model=ReportRead)
+@app.patch(
+    f"{settings.api_prefix}/reports/{{report_id}}/status",
+    response_model=ReportRead,
+)
 def patch_report_status(
     report_id: UUID,
     payload: ReportStatusUpdate,

@@ -11,7 +11,7 @@ from sqlalchemy import cast, func, select
 from sqlalchemy.orm import Session
 
 from ..config import Settings
-from ..models import Report, ReportStatus
+from ..models import Report, ReportClientSubmission, ReportStatus
 from ..schemas import ReportRead
 from .detection import DetectionResult
 
@@ -20,11 +20,27 @@ from .detection import DetectionResult
 class ReportMutationResult:
     report: Report
     deduped: bool
+    client_report_id: UUID | None = None
+    replayed: bool = False
 
 
 def _make_geography_point(latitude: float, longitude: float):
     point = func.ST_SetSRID(func.ST_MakePoint(longitude, latitude), 4326)
     return cast(point, Geography)
+
+
+def _normalize_capture_time(captured_at: datetime | None) -> datetime:
+    if captured_at is None:
+        return datetime.now(UTC)
+    if captured_at.tzinfo is None:
+        return captured_at.replace(tzinfo=UTC)
+    return captured_at.astimezone(UTC)
+
+
+def _latest_timestamp(first: datetime, second: datetime) -> datetime:
+    normalized_first = _normalize_capture_time(first)
+    normalized_second = _normalize_capture_time(second)
+    return max(normalized_first, normalized_second)
 
 
 def list_reports(db: Session, status: ReportStatus | None) -> list[Report]:
@@ -42,7 +58,22 @@ def upsert_detected_report(
     longitude: float,
     detection: DetectionResult,
     image_filename: str,
+    captured_at: datetime | None = None,
+    client_report_id: UUID | None = None,
 ) -> ReportMutationResult:
+    if client_report_id is not None:
+        existing_submission = db.get(ReportClientSubmission, client_report_id)
+        if existing_submission is not None:
+            report = db.get(Report, existing_submission.report_id)
+            if report is not None:
+                return ReportMutationResult(
+                    report=report,
+                    deduped=existing_submission.deduped,
+                    client_report_id=client_report_id,
+                    replayed=True,
+                )
+
+    photo_taken_at = _normalize_capture_time(captured_at)
     geography_point = _make_geography_point(latitude, longitude)
 
     existing_report = db.scalars(
@@ -60,12 +91,26 @@ def upsert_detected_report(
 
     if existing_report is not None:
         existing_report.upvotes += 1
-        existing_report.last_photo_reported_at = datetime.now(UTC)
+        existing_report.last_photo_reported_at = _latest_timestamp(
+            existing_report.last_photo_reported_at,
+            photo_taken_at,
+        )
+        if client_report_id is not None:
+            db.add(
+                ReportClientSubmission(
+                    client_report_id=client_report_id,
+                    report_id=existing_report.id,
+                    deduped=True,
+                )
+            )
         db.commit()
         db.refresh(existing_report)
-        return ReportMutationResult(report=existing_report, deduped=True)
+        return ReportMutationResult(
+            report=existing_report,
+            deduped=True,
+            client_report_id=client_report_id,
+        )
 
-    now = datetime.now(UTC)
     new_report = Report(
         issue_type=detection.issue_type,
         confidence=detection.confidence,
@@ -75,13 +120,27 @@ def upsert_detected_report(
         image_path=image_filename,
         status=ReportStatus.OPEN.value,
         upvotes=1,
-        last_photo_reported_at=now,
+        captured_at=photo_taken_at,
+        last_photo_reported_at=photo_taken_at,
     )
 
     db.add(new_report)
+    db.flush()
+    if client_report_id is not None:
+        db.add(
+            ReportClientSubmission(
+                client_report_id=client_report_id,
+                report_id=new_report.id,
+                deduped=False,
+            )
+        )
     db.commit()
     db.refresh(new_report)
-    return ReportMutationResult(report=new_report, deduped=False)
+    return ReportMutationResult(
+        report=new_report,
+        deduped=False,
+        client_report_id=client_report_id,
+    )
 
 
 def update_report_status(
@@ -114,6 +173,7 @@ def to_report_read(report: Report, settings: Settings) -> ReportRead:
         image_url=image_url,
         status=ReportStatus(report.status),
         upvotes=report.upvotes,
+        captured_at=report.captured_at,
         last_photo_reported_at=report.last_photo_reported_at,
         created_at=report.created_at,
         updated_at=report.updated_at,

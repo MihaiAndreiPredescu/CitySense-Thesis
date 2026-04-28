@@ -268,12 +268,31 @@
       attribution: "&copy; OpenStreetMap contributors",
     }).addTo(map);
 
+    function formatDateTime(value) {
+      if (!value) {
+        return "Not recorded";
+      }
+
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) {
+        return "Not recorded";
+      }
+
+      return new Intl.DateTimeFormat(undefined, {
+        dateStyle: "medium",
+        timeStyle: "short",
+      }).format(date);
+    }
+
     function popupHtml(report) {
       return `
         <strong>${report.issue_type}</strong><br />
         Confidence: ${(report.confidence * 100).toFixed(1)}%<br />
         Upvotes: ${report.upvotes}<br />
         Status: ${report.status}<br />
+        Date and time the last photo report was taken: ${formatDateTime(
+          report.last_photo_reported_at
+        )}<br />
         Coordinates: ${report.latitude.toFixed(5)}, ${report.longitude.toFixed(5)}
       `;
     }
@@ -323,6 +342,8 @@
           <div class="meta">
             Confidence ${(report.confidence * 100).toFixed(1)}% ·
             ${report.upvotes} upvotes<br />
+            Date and time the last photo report was taken:
+            ${formatDateTime(report.last_photo_reported_at)}<br />
             ${report.latitude.toFixed(5)}, ${report.longitude.toFixed(5)}
           </div>
           <div class="${badgeClass}">${report.status}</div>

@@ -8,10 +8,7 @@ import '../services/citysense_api_client.dart';
 import '../widgets/report_details_sheet.dart';
 
 class MapScreen extends StatefulWidget {
-  const MapScreen({
-    required this.apiClient,
-    super.key,
-  });
+  const MapScreen({required this.apiClient, super.key});
 
   final CitySenseApiClient apiClient;
 
@@ -56,9 +53,8 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _openDetails(IssueReport report) {
-    showModalBottomSheet<void>(
+    showDialog<void>(
       context: context,
-      showDragHandle: true,
       builder: (_) => ReportDetailsSheet(report: report),
     );
   }
@@ -83,66 +79,63 @@ class _MapScreenState extends State<MapScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Text(
-                      _errorMessage!,
-                      textAlign: TextAlign.center,
-                    ),
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(_errorMessage!, textAlign: TextAlign.center),
+              ),
+            )
+          : Stack(
+              children: [
+                FlutterMap(
+                  options: MapOptions(
+                    initialCenter: initialCenter,
+                    initialZoom: _reports.isEmpty ? 12 : 15,
                   ),
-                )
-              : Stack(
                   children: [
-                    FlutterMap(
-                      options: MapOptions(
-                        initialCenter: initialCenter,
-                        initialZoom: _reports.isEmpty ? 12 : 15,
-                      ),
-                      children: [
-                        TileLayer(
-                          urlTemplate:
-                              'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                          userAgentPackageName: 'com.example.mobile_app',
-                        ),
-                        MarkerLayer(
-                          markers: _reports
-                              .map(
-                                (report) => Marker(
-                                  point: LatLng(report.latitude, report.longitude),
-                                  width: 80,
-                                  height: 80,
-                                  child: GestureDetector(
-                                    onTap: () => _openDetails(report),
-                                    child: Icon(
-                                      Icons.location_on,
-                                      color: report.upvotes >= 3
-                                          ? const Color(0xFFC1440E)
-                                          : const Color(0xFFD96C1A),
-                                      size: 34 + report.upvotes.toDouble(),
-                                    ),
-                                  ),
-                                ),
-                              )
-                              .toList(),
-                        ),
-                      ],
+                    TileLayer(
+                      urlTemplate:
+                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      userAgentPackageName: 'com.example.mobile_app',
                     ),
-                    if (_reports.isEmpty)
-                      const Center(
-                        child: Card(
-                          margin: EdgeInsets.all(24),
-                          child: Padding(
-                            padding: EdgeInsets.all(18),
-                            child: Text(
-                              'No open reports yet. Submit one from the Report tab.',
-                              textAlign: TextAlign.center,
+                    MarkerLayer(
+                      markers: _reports
+                          .map(
+                            (report) => Marker(
+                              point: LatLng(report.latitude, report.longitude),
+                              width: 80,
+                              height: 80,
+                              child: GestureDetector(
+                                onTap: () => _openDetails(report),
+                                child: Icon(
+                                  Icons.location_on,
+                                  color: report.upvotes >= 3
+                                      ? const Color(0xFFC1440E)
+                                      : const Color(0xFFD96C1A),
+                                  size: 34 + report.upvotes.toDouble(),
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
-                      ),
+                          )
+                          .toList(),
+                    ),
                   ],
                 ),
+                if (_reports.isEmpty)
+                  const Center(
+                    child: Card(
+                      margin: EdgeInsets.all(24),
+                      child: Padding(
+                        padding: EdgeInsets.all(18),
+                        child: Text(
+                          'No open reports yet. Submit one from the Report tab.',
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
     );
   }
 }

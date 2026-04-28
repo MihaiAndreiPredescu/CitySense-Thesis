@@ -89,7 +89,7 @@ The implementation is intentionally direct. I wanted the user to understand imme
 
 \subsection{Map Screen}
 
-The second screen shows open reports on a map. Every report is represented by a marker, and the marker size and color help indicate how important the report is. If a marker is tapped, the application shows more details such as issue type, confidence, status, and upvote count.
+The second screen shows open reports on a map. Every report is represented by a marker, and the marker size and color help indicate how important the report is. If a marker is tapped, the application shows a centered details dialog with the issue type, confidence, status, upvote count, coordinates, and the date and time when the last photo report was taken. This keeps the selected pothole information visible without the bottom navigation area covering the metadata.
 
 This screen covers functionality F2 from the semester work because it demonstrates that submitted reports are not just stored, but also visualized in a meaningful way.
 
@@ -197,7 +197,7 @@ The mobile application does not run the model directly. It only sends the image 
 
 \subsection{Report Service}
 
-The report service contains the main business logic. It receives the coordinates, the detection result, and the image metadata. Then it decides whether a new report should be created or whether the request should be merged into an existing report. This is where the spatial duplicate logic is applied.
+The report service contains the main business logic. It receives the coordinates, the detection result, and the image metadata. Then it decides whether a new report should be created or whether the request should be merged into an existing report. This is where the spatial duplicate logic is applied. The service also stores \texttt{last\_photo\_reported\_at}, which is initialized when a pothole is first reported and refreshed whenever a duplicate photo report is merged into the same open issue.
 
 \section{Duplicate Merge Logic}
 
@@ -219,6 +219,7 @@ The administrator dashboard was implemented as a lightweight web page served by 
   \item a report list;
   \item a map with report markers;
   \item report details such as confidence and upvotes;
+  \item the date and time when the last photo report was taken;
   \item a filter by report status;
   \item a button for marking reports as resolved.
 \end{itemize}

@@ -25,6 +25,45 @@ def initialize_database() -> None:
     with engine.begin() as connection:
         connection.execute(text("CREATE EXTENSION IF NOT EXISTS postgis"))
     Base.metadata.create_all(bind=engine)
+    _ensure_report_columns()
+
+
+def _ensure_report_columns() -> None:
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                ALTER TABLE reports
+                ADD COLUMN IF NOT EXISTS last_photo_reported_at
+                TIMESTAMP WITH TIME ZONE
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                UPDATE reports
+                SET last_photo_reported_at = COALESCE(updated_at, created_at, now())
+                WHERE last_photo_reported_at IS NULL
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                ALTER TABLE reports
+                ALTER COLUMN last_photo_reported_at SET DEFAULT now()
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                ALTER TABLE reports
+                ALTER COLUMN last_photo_reported_at SET NOT NULL
+                """
+            )
+        )
 
 
 def get_db() -> Generator[Session, None, None]:

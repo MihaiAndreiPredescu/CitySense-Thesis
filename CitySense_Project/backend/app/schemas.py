@@ -20,6 +20,7 @@ class ReportRead(BaseModel):
     image_url: str | None = None
     status: ReportStatus
     upvotes: int
+    last_photo_reported_at: datetime
     created_at: datetime
     updated_at: datetime
 

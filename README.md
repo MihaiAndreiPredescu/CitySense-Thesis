@@ -12,6 +12,7 @@ CitySense is a pothole-first civic reporting platform developed as a Computer Sc
 
 - Photo-based pothole reporting from a Flutter mobile app
 - Automatic geolocation capture and upload
+- Offline report queue on the phone with captured timestamp, location, and automatic sync when the backend becomes reachable
 - YOLO-based pothole detection with a documented demo fallback for local UI smoke tests
 - PostGIS duplicate detection inside a 10 meter radius
 - Upvote-based merging of repeated reports
@@ -44,6 +45,19 @@ flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000
 ```
 
 Use your machine IP instead of `10.0.2.2` when testing on a physical Android device.
+
+## How the app works
+
+1. The citizen opens the Flutter app and taps `Capture & submit`.
+2. The app requests location permission, opens the camera, and records the photo plus GPS coordinates.
+3. The report is saved locally first, including the copied image file, latitude, longitude, capture time, retry state, and a client-generated report UUID.
+4. The app checks `GET /api/v1/health` on the configured backend URL.
+5. If the backend is reachable, the queued report is uploaded as multipart form data with `image`, `latitude`, `longitude`, `captured_at`, and `client_report_id`.
+6. If the backend is not reachable, the report remains on the phone and the UI shows that it was saved offline.
+7. When connectivity changes or the app returns to the foreground, pending reports are retried automatically.
+8. The backend uses `client_report_id` as an idempotency key, so retrying the same offline report does not create duplicate upvotes.
+9. The backend runs pothole detection, applies the PostGIS 10 meter duplicate check, then creates a new report or merges it into an existing open report.
+10. The mobile map and admin dashboard fetch open reports and display their location, priority, timestamps, and status.
 
 ### 3. Thesis
 

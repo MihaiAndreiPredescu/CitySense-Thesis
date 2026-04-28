@@ -93,14 +93,14 @@ class ReportDetailsSheet extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Date and time the last photo report was taken',
+                              'Captured at',
                               style: theme.textTheme.labelLarge?.copyWith(
                                 color: const Color(0xFF625B57),
                               ),
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              _formatDateTime(report.lastPhotoReportedAt),
+                              _formatDateTime(report.capturedAt),
                               style: theme.textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.w700,
                                 color: const Color(0xFF2F241F),
@@ -144,6 +144,12 @@ class ReportDetailsSheet extends StatelessWidget {
                   value:
                       '${report.latitude.toStringAsFixed(5)}, '
                       '${report.longitude.toStringAsFixed(5)}',
+                ),
+                const Divider(height: 22),
+                _DetailRow(
+                  icon: Icons.history,
+                  label: 'Latest photo report',
+                  value: _formatDateTime(report.lastPhotoReportedAt),
                 ),
               ],
             ),

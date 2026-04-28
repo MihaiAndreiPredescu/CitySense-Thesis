@@ -290,6 +290,7 @@
         Confidence: ${(report.confidence * 100).toFixed(1)}%<br />
         Upvotes: ${report.upvotes}<br />
         Status: ${report.status}<br />
+        Captured at: ${formatDateTime(report.captured_at)}<br />
         Date and time the last photo report was taken: ${formatDateTime(
           report.last_photo_reported_at
         )}<br />
@@ -342,6 +343,8 @@
           <div class="meta">
             Confidence ${(report.confidence * 100).toFixed(1)}% ·
             ${report.upvotes} upvotes<br />
+            Captured at:
+            ${formatDateTime(report.captured_at)}<br />
             Date and time the last photo report was taken:
             ${formatDateTime(report.last_photo_reported_at)}<br />
             ${report.latitude.toFixed(5)}, ${report.longitude.toFixed(5)}

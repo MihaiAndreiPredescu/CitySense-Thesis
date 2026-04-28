@@ -8,6 +8,7 @@ CitySense is organized as a client-server application with a small administrativ
 
 \begin{enumerate}[label=\arabic*.]
   \item the Flutter mobile application;
+  \item the local offline report queue on the phone;
   \item the FastAPI backend;
   \item the PostgreSQL/PostGIS database;
   \item the YOLO-based detection service integrated in the backend;
@@ -18,14 +19,15 @@ The flow between these components is the following:
 
 \begin{enumerate}[label=\arabic*.]
   \item The mobile app captures the image and the user location.
-  \item The app sends the report to the backend through the REST API.
+  \item The app stores the report locally together with the capture time and a client-generated UUID.
+  \item The app sends the report to the backend through the REST API when the configured backend address is reachable.
   \item The backend stores the uploaded image and runs the detector.
   \item The backend checks for a nearby duplicate through PostGIS.
   \item The backend stores or merges the report in the database.
   \item The app and the dashboard request the list of reports and render them on a map.
 \end{enumerate}
 
-This architecture was chosen because it keeps heavy logic out of the phone and makes the backend the single source of truth.
+This architecture was chosen because it keeps heavy logic out of the phone and makes the backend the single source of truth, while still allowing a citizen to record a report in places where the local backend network is temporarily unavailable.
 
 \section{Deployment with Docker Compose}
 
@@ -75,15 +77,16 @@ The report screen is the most important part of the citizen workflow. It contain
 \begin{itemize}
   \item a photo preview area;
   \item a short status card with user feedback;
+  \item an offline queue status card when reports are waiting to be synchronized;
   \item a button that triggers the camera flow and submission.
 \end{itemize}
 
-The implementation is intentionally direct. I wanted the user to understand immediately what the app is for. There are no advanced menus, no long forms, and no extra fields that could slow down the interaction. A screenshot of this interface is shown again in Figure~\ref{fig:app_interface}.
+The implementation is intentionally direct. I wanted the user to understand immediately what the app is for. There are no advanced menus, no long forms, and no extra fields that could slow down the interaction. Internally, however, the report is first saved on the phone and then submitted from that saved copy. This makes the online and offline paths use the same data structure. A screenshot of this interface is shown again in Figure~\ref{fig:app_interface}.
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.45\textwidth]{figures/app_interface_pothole_1775200631079.png}
-    \caption{Main report screen of the mobile application.}
+    \includegraphics[width=0.45\textwidth]{figures/citysense_mobile_app_actual.png}
+    \caption{Current report screen of the mobile application running on the Android device.}
     \label{fig:app_interface}
 \end{figure}
 
@@ -92,6 +95,12 @@ The implementation is intentionally direct. I wanted the user to understand imme
 The second screen shows open reports on a map. Every report is represented by a marker, and the marker size and color help indicate how important the report is. If a marker is tapped, the application shows a centered details dialog with the issue type, confidence, status, upvote count, coordinates, and the date and time when the last photo report was taken. This keeps the selected pothole information visible without the bottom navigation area covering the metadata.
 
 This screen covers functionality F2 from the semester work because it demonstrates that submitted reports are not just stored, but also visualized in a meaningful way.
+
+\subsection{How the Application Works in Practice}
+
+In normal use, the citizen opens the application on the report tab, captures a photo, and allows the app to read the current location. The app immediately copies the photo into its own storage and writes a local queue entry containing the image path, latitude, longitude, capture time, retry state, and client report UUID. This local write happens before the network request, so the report is not lost if the backend is unavailable.
+
+After the local save, the synchronization service checks the backend health endpoint. If the backend can be reached on the configured local network address, the app uploads the queued report as a multipart request. If the backend cannot be reached, the report remains in the offline queue and the interface informs the user that it was saved offline. The same queue is retried when connectivity changes and when the app returns to the foreground. On the backend, the client report UUID makes the retry idempotent: a repeated upload for the same local report returns the already-associated backend report instead of increasing the upvote counter twice.
 
 \subsection{Internal Flutter Structure}
 
@@ -104,6 +113,8 @@ Inside the mobile project, the code is split into configuration, models, service
   \item \textbf{screens} for the main pages of the app;
   \item \textbf{widgets} for reusable interface pieces.
 \end{itemize}
+
+The offline support is implemented in the service layer. The \texttt{Offline\allowbreak Report\allowbreak Repository} stores pending reports in a local SQLite database and copies the image into the application documents directory so it is not lost when the camera cache is cleaned. The \texttt{Report\allowbreak Sync\allowbreak Service} listens for connectivity changes, checks the backend health endpoint, and uploads pending reports in chronological order. The same service is also triggered when the application returns to the foreground. This means that when the phone reconnects to the same network as the backend and the configured API address becomes reachable, queued reports are sent without requiring the user to repeat the capture flow.
 
 \section{Design of the Backend}
 
@@ -125,7 +136,7 @@ This is important because it separates code from deployment details. For example
 
 \subsection{Persistence Layer}
 
-The persistence layer is built with SQLAlchemy and PostgreSQL. The report entity matches the specification from the previous chapter. Besides the normal numeric and text fields, the model also includes a spatial \texttt{location} field. That field is the one used by PostGIS during the duplicate check.
+The persistence layer is built with SQLAlchemy and PostgreSQL. The report entity matches the specification from the previous chapter. Besides the normal numeric and text fields, the model also includes a spatial \texttt{location} field. That field is the one used by PostGIS during the duplicate check. The backend also stores \texttt{captured\_\allowbreak at}, which represents when the photo was taken on the phone, and \texttt{last\_\allowbreak photo\_\allowbreak reported\_\allowbreak at}, which represents the newest photo time among merged duplicate submissions.
 
 \subsection{Detection Service}
 
@@ -197,7 +208,9 @@ The mobile application does not run the model directly. It only sends the image 
 
 \subsection{Report Service}
 
-The report service contains the main business logic. It receives the coordinates, the detection result, and the image metadata. Then it decides whether a new report should be created or whether the request should be merged into an existing report. This is where the spatial duplicate logic is applied. The service also stores \texttt{last\_photo\_reported\_at}, which is initialized when a pothole is first reported and refreshed whenever a duplicate photo report is merged into the same open issue.
+The report service contains the main business logic. It receives the coordinates, the detection result, the capture time, the optional client report identifier, and the image metadata. Then it decides whether a new report should be created or whether the request should be merged into an existing report. This is where the spatial duplicate logic is applied. The service also stores \texttt{last\_photo\_reported\_at}, which is initialized when a pothole is first reported and refreshed whenever a duplicate photo report is merged into the same open issue.
+
+For offline synchronization, the service records every client report identifier in the \texttt{report\_client\_submissions} table. If the same identifier is received again, the backend returns the already-associated report instead of applying the mutation a second time. This makes retries safe when the mobile app loses connectivity after an upload but before receiving the HTTP response.
 
 \section{Duplicate Merge Logic}
 
@@ -228,8 +241,8 @@ The dashboard is shown in Figure~\ref{fig:admin_dashboard}. I kept the design si
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.85\textwidth]{figures/admin_dashboard_map_1775200648148.png}
-    \caption{Administrative dashboard used to inspect and resolve reports.}
+    \includegraphics[width=0.85\textwidth]{figures/citysense_admin_dashboard_actual.png}
+    \caption{Current administrative dashboard showing a synchronized report on the map.}
     \label{fig:admin_dashboard}
 \end{figure}
 
@@ -243,12 +256,13 @@ The steps of F1 are:
   \item request location access;
   \item open the camera;
   \item capture and preview the image;
-  \item send the image and coordinates;
-  \item receive the response from the backend;
-  \item display either success, merge, or error feedback.
+  \item save the image, coordinates, capture time, and client report identifier locally;
+  \item send the saved report when the backend is reachable;
+  \item receive the response from the backend or keep the report queued;
+  \item display either success, merge, offline queue, or error feedback.
 \end{enumerate}
 
-This flow was implemented and tested end to end. The result is visible not only on the report screen, but also later in the map and dashboard.
+This flow was implemented and tested end to end. The result is visible not only on the report screen, but also later in the map and dashboard. The offline queue keeps the citizen action short even when the phone is not currently connected to the backend network.
 
 \section{Implementation of Functionality F2}
 
@@ -325,6 +339,9 @@ Table~\ref{tab:functional_tests} summarizes the main tested scenarios.
 Backend health check & Backend exposes runtime information & Implemented and reachable through the health endpoint. \\
 Valid report submission & New or merged report is returned & Implemented through the report endpoint. \\
 Duplicate report nearby & Existing report gains one upvote & Implemented through PostGIS distance check. \\
+Offline report capture & Report is saved locally with image, coordinates, capture time, and client UUID & Implemented in the Flutter offline repository. \\
+Offline synchronization & Queued reports are sent after backend reachability is restored & Implemented through connectivity and app-resume sync triggers. \\
+Repeated client report ID & Backend does not count the same client submission twice & Implemented through the client submission receipt table. \\
 Open reports request & Backend returns report list & Implemented for both mobile app and dashboard. \\
 Status update & Report changes to resolved & Implemented through the PATCH endpoint. \\
 Dashboard visualization & Reports appear on a map with details & Implemented through the admin page. \\

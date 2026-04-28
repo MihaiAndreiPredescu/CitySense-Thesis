@@ -1,9 +1,9 @@
 \chapter{Conclusions and Future Work}
 \label{conclusions}
 
-This thesis presented CitySense, an Android-first civic reporting platform designed to simplify pothole reporting through mobile capture, backend automation, and geospatial duplicate handling. The final system combines a Flutter mobile application, a FastAPI backend, a PostgreSQL/PostGIS data layer, and a web dashboard for operational review. Instead of treating each report as an isolated ticket, the system aggregates nearby reports into a single issue with an increasing upvote count. This makes the resulting data more useful for prioritization and more readable on a map.
+This thesis presented CitySense, an Android-first civic reporting platform designed to simplify pothole reporting through mobile capture, offline report storage, backend automation, and geospatial duplicate handling. The final system combines a Flutter mobile application, a local phone-side report queue, a FastAPI backend, a PostgreSQL/PostGIS data layer, and a web dashboard for operational review. Instead of treating each report as an isolated ticket, the system aggregates nearby reports into a single issue with an increasing upvote count. This makes the resulting data more useful for prioritization and more readable on a map.
 
-The work demonstrates that a practical civic reporting pipeline can be built by integrating established technologies rather than inventing a new algorithm from scratch. Flutter supports a simple citizen workflow, FastAPI and SQLAlchemy provide a clear service boundary, PostGIS supplies the spatial reasoning needed for duplicate merging, and a YOLO-based detector enables automation of the issue classification step. Together, these parts form a coherent prototype that is appropriate for a software-oriented bachelor thesis.
+The work demonstrates that a practical civic reporting pipeline can be built by integrating established technologies rather than inventing a new algorithm from scratch. Flutter supports a simple citizen workflow, SQLite keeps captured reports safe until synchronization, FastAPI and SQLAlchemy provide a clear service boundary, PostGIS supplies the spatial reasoning needed for duplicate merging, and a YOLO-based detector enables automation of the issue classification step. Together, these parts form a coherent prototype that is appropriate for a software-oriented bachelor thesis.
 
 At the same time, the project remains intentionally scoped. The system focuses on potholes rather than on a wide taxonomy of municipal issues. The repository contains training and evaluation utilities for a dedicated pothole detector, but the thesis does not claim a final benchmark-grade model result without a completed reproducible training run. This boundary is important because it keeps the written document aligned with the implemented evidence.
 
@@ -15,6 +15,7 @@ Several future directions follow naturally from the current version:
   \item training and benchmarking a dedicated pothole checkpoint on RDD2022 or another public road-damage dataset;
   \item extending the issue taxonomy to include litter, damaged signs, and other urban defects;
   \item adding user accounts, municipal roles, and notification workflows;
+  \item extending offline synchronization with background scheduling and clearer conflict-resolution tools;
   \item connecting the dashboard to maintenance scheduling or work-order systems;
   \item improving map analytics through clustering, heatmaps, and historical trends.
 \end{itemize}

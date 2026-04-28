@@ -6,7 +6,7 @@ void main() {
   testWidgets('CitySense shell renders the main navigation labels', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const CitySenseApp());
+    await tester.pumpWidget(const CitySenseApp(startSyncAutomatically: false));
 
     expect(find.text('Report'), findsOneWidget);
     expect(find.text('Map'), findsOneWidget);

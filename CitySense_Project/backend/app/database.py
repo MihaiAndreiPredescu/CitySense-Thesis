@@ -64,6 +64,40 @@ def _ensure_report_columns() -> None:
                 """
             )
         )
+        connection.execute(
+            text(
+                """
+                ALTER TABLE reports
+                ADD COLUMN IF NOT EXISTS captured_at
+                TIMESTAMP WITH TIME ZONE
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                UPDATE reports
+                SET captured_at = COALESCE(last_photo_reported_at, created_at, now())
+                WHERE captured_at IS NULL
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                ALTER TABLE reports
+                ALTER COLUMN captured_at SET DEFAULT now()
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                ALTER TABLE reports
+                ALTER COLUMN captured_at SET NOT NULL
+                """
+            )
+        )
 
 
 def get_db() -> Generator[Session, None, None]:

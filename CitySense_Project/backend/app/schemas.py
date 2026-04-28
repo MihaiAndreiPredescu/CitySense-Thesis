@@ -20,6 +20,7 @@ class ReportRead(BaseModel):
     image_url: str | None = None
     status: ReportStatus
     upvotes: int
+    captured_at: datetime
     last_photo_reported_at: datetime
     created_at: datetime
     updated_at: datetime
@@ -29,6 +30,8 @@ class ReportSubmissionResponse(BaseModel):
     message: str
     deduped: bool
     report: ReportRead
+    client_report_id: UUID | None = None
+    replayed: bool = False
 
 
 class ReportStatusUpdate(BaseModel):

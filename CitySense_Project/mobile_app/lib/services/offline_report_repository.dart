@@ -69,6 +69,19 @@ class OfflineReportRepository {
     return _countWhereState(_failedState);
   }
 
+  Future<void> deleteFailedReports() async {
+    final rows = await (await _db).query(
+      _tableName,
+      where: 'state = ?',
+      whereArgs: [_failedState],
+    );
+
+    for (final row in rows) {
+      final report = OfflineReport.fromMap(row);
+      await deleteReport(report.clientReportId);
+    }
+  }
+
   Future<void> markRetryableFailure({
     required String clientReportId,
     required String error,

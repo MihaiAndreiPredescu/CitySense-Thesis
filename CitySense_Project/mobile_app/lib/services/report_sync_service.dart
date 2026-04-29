@@ -56,6 +56,7 @@ class ReportSyncService extends ChangeNotifier {
     }
 
     _isStarted = true;
+    await repository.deleteFailedReports();
     await _refreshCounts();
     _connectivitySubscription = _connectivity.onConnectivityChanged.listen((
       results,
@@ -111,10 +112,7 @@ class ReportSyncService extends ChangeNotifier {
         return OfflineSubmissionOutcome.queued(localReport, _lastSyncMessage!);
       }
 
-      await repository.markPermanentFailure(
-        clientReportId: localReport.clientReportId,
-        error: error.message,
-      );
+      await repository.deleteReport(localReport.clientReportId);
       await _refreshCounts();
       rethrow;
     } catch (error) {
@@ -165,10 +163,9 @@ class ReportSyncService extends ChangeNotifier {
             break;
           }
 
-          await repository.markPermanentFailure(
-            clientReportId: report.clientReportId,
-            error: error.message,
-          );
+          await repository.deleteReport(report.clientReportId);
+          _lastSyncMessage =
+              'A saved report was not accepted: ${error.message}';
         } catch (error) {
           await repository.markRetryableFailure(
             clientReportId: report.clientReportId,

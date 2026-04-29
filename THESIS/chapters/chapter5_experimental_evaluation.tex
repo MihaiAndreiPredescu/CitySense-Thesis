@@ -149,62 +149,103 @@ The detection service wraps the YOLO model. It can work in two modes:
 
 The demo mode was useful during development because it allowed me to verify the API flow, database insertion, and mobile feedback even when a final trained model was not available. At the same time, the code still keeps the real detector path as the intended production-like behavior.
 
-\subsection{YOLOv8 Dataset and Training Workflow}
+\subsection{YOLOv8 Dataset, Training, and Weight Integration}
 
-The real detection mode requires a checkpoint trained for pothole detection. A general YOLOv8 checkpoint such as \texttt{yolov8n.pt} is useful as a starting point, but it is not sufficient by itself because it is not specialized for the pothole class used by CitySense. The model must either be trained on a pothole dataset or replaced by an existing pothole-specific checkpoint.
+The real detection mode uses a YOLOv8 checkpoint trained specifically for the \texttt{pothole} class. The starting point was the lightweight \texttt{yolov8n.pt} model from Ultralytics \cite{jocher2023ultralytics}. This model is small enough to run on the available CPU hardware during development, while still being expressive enough for a single-class pothole detector.
 
-The intended dataset format is the standard YOLO detection layout \cite{jocher2023ultralytics}. A suitable export contains training images, validation images, label files with bounding boxes, and a \texttt{data.yaml} file. The class name must be consistent with the backend detector contract. In this project, the expected class is \texttt{pothole}. This is important because the backend accepts only labels that normalize to a pothole label.
-
-The dataset structure expected by the training script is:
+The dataset was exported in YOLOv8 format from Roboflow Universe \cite{roboflow_universe}. The final local dataset structure used by the project is:
 
 \begin{verbatim}
-pothole_dataset/
-  images/
-    train/
-    val/
-  labels/
-    train/
-    val/
+DATASET/
+  train/
+    images/
+    labels/
+  valid/
+    images/
+    labels/
+  test/
+    images/
+    labels/
   data.yaml
 \end{verbatim}
 
-An example \texttt{data.yaml} file is:
+The \texttt{data.yaml} file exposes a single class:
 
 \begin{verbatim}
-path: C:/datasets/pothole_dataset
-train: images/train
-val: images/val
+train: train/images
+val: valid/images
+test: test/images
 
-names:
-  0: pothole
+nc: 1
+names: ['pothole']
 \end{verbatim}
 
-For this project, a practical dataset source is Roboflow Universe \cite{roboflow_universe}, because it can export object-detection datasets directly in YOLOv8 format. A dataset should be selected only if it has clear pothole bounding boxes and a clean class list. Datasets that contain several inconsistent labels for the same concept, such as \texttt{Pothole}, \texttt{potholes}, \texttt{object}, or numeric placeholder labels, should be cleaned before training.
+Before training, the dataset was checked for missing labels, invalid class identifiers, and non-normalized YOLO bounding boxes. The empty label files were kept intentionally because they represent background images where no pothole is visible. Such images are useful because they teach the detector not to create a report for every road scene.
 
-The repository contains a training utility that fine-tunes a YOLOv8 model and copies the best checkpoint to the location used by the backend:
+The dataset split is summarized in Table~\ref{tab:yolo_dataset_split}. The number of boxes is higher than the number of images because one image may contain several potholes.
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.16\linewidth} >{\raggedleft\arraybackslash}p{0.16\linewidth} >{\raggedleft\arraybackslash}p{0.16\linewidth} >{\raggedleft\arraybackslash}p{0.16\linewidth} >{\raggedleft\arraybackslash}p{0.20\linewidth}}
+\toprule
+\textbf{Split} & \textbf{Images} & \textbf{Labels} & \textbf{Boxes} & \textbf{Background images} \\
+\midrule
+Train & 1037 & 1037 & 3515 & 94 \\
+Validation & 296 & 296 & 988 & 27 \\
+Test & 149 & 149 & 511 & 23 \\
+\bottomrule
+\end{tabular}
+\caption{YOLOv8 pothole dataset split used for training and evaluation.}
+\label{tab:yolo_dataset_split}
+\end{table}
+
+Training was performed on the local CPU environment with Python 3.12.10, Ultralytics 8.4.42, and PyTorch 2.11.0 CPU. The GPU check did not detect CUDA on the machine, so the training command was configured for CPU execution and Windows-safe data loading:
 
 \begin{verbatim}
-cd C:\UBB\THESIS\CitySense_Project\backend
-python scripts/train_pothole_detector.py ^
-  --data C:\datasets\pothole_dataset\data.yaml ^
-  --epochs 50 ^
-  --imgsz 640
+yolo detect train ^
+  model=yolov8n.pt ^
+  data="C:\UBB\THESIS\DATASET\data.yaml" ^
+  epochs=50 ^
+  imgsz=416 ^
+  batch=8 ^
+  device=cpu ^
+  workers=0 ^
+  project="runs/pothole" ^
+  name=yolov8n_cpu_50
 \end{verbatim}
 
-After training, the script copies the best model to:
+The final training run lasted approximately 13,713 seconds, or about 3.8 hours. The best model weight was copied into the backend model directory as:
 
 \begin{verbatim}
 CitySense_Project/backend/data/models/pothole_yolov8n.pt
 \end{verbatim}
 
-The backend then uses the checkpoint when the detector mode is set to YOLO:
+The backend reads this file through the \texttt{MODEL\_PATH} environment variable when \texttt{DETECTOR\_MODE=yolo}. A small metadata file, \texttt{pothole\_yolov8n.metadata.json}, stores the training settings, dataset counts, metrics, and calibrated runtime threshold so that the deployed checkpoint can be traced back to the experiment that produced it.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.90\textwidth]{figures/yolov8n_training_results.png}
+    \caption{Training curves produced by the 50-epoch YOLOv8n pothole run.}
+    \label{fig:yolov8_training_curves}
+\end{figure}
+
+The mobile application does not run the model directly. It only sends the image and location to the backend. This keeps the phone application lighter and makes it possible to update or replace the model without reinstalling the mobile app.
+
+\subsection{Detector Runtime Configuration}
+
+The deployed detector configuration is part of the backend environment. For the trained checkpoint used in this thesis, the relevant values are:
 
 \begin{verbatim}
 DETECTOR_MODE=yolo
-MODEL_PATH=/app/data/models/pothole_yolov8n.pt
+MODEL_PATH=data/models/pothole_yolov8n.pt
+MIN_DETECTION_CONFIDENCE=0.65
+DETECTOR_IMAGE_SIZE=416
+DETECTOR_IOU_THRESHOLD=0.50
 \end{verbatim}
 
-The mobile application does not run the model directly. It only sends the image and location to the backend. This keeps the phone application lighter and makes it possible to update or replace the model without reinstalling the mobile app.
+The \texttt{PotholeDetector} service loads the checkpoint lazily the first time an image is processed. It then runs inference with the configured confidence threshold, image size, and non-maximum suppression IoU threshold. The detector filters predictions by class name and accepts only labels that normalize to \texttt{pothole}. From the accepted detections, the backend stores the highest-confidence result as the confidence value of the report.
+
+The same values are exposed through the health endpoint. This makes it possible to verify during a demonstration that the backend is actually using the YOLO detector, the expected model path, the calibrated threshold, and the same image size used during calibration.
 
 \subsection{Report Service}
 
@@ -283,48 +324,111 @@ The testing environment was the following:
   \item Chrome execution for web-oriented smoke tests during development.
 \end{itemize}
 
-\section{Detector Evaluation Protocol}
+\section{Detector Evaluation and Calibration}
 
-Because the YOLO component can be used in both demo mode and real checkpoint mode, the evaluation must separate functional integration from model quality. Functional integration asks whether the backend can receive an image, call the detector wrapper, and continue the reporting workflow. Model quality asks whether a trained checkpoint actually detects potholes accurately on unseen images.
+The detector was evaluated in two ways. First, the Ultralytics validation command was used to compute standard object-detection metrics on the validation and test splits. Second, the confidence threshold was calibrated separately because the best threshold for a civic reporting application is not always the default value used for visual experimentation.
 
-For a final trained checkpoint, the recommended evaluation procedure is:
-
-\begin{enumerate}[label=\arabic*.]
-  \item keep a validation or test folder separate from the training images;
-  \item run the trained model on that folder using the evaluation script or the Ultralytics validation command;
-  \item report precision, recall, \texttt{mAP@0.5}, and \texttt{mAP@0.5:0.95};
-  \item inspect several correct detections, false positives, and false negatives;
-  \item choose a confidence threshold that balances missed potholes against false reports.
-\end{enumerate}
-
-The repository also contains a batch inference script for project-level evaluation:
+The validation command for the held-out test split was:
 
 \begin{verbatim}
-cd C:\UBB\THESIS\CitySense_Project\backend
-python scripts/evaluate_detector.py ^
-  --images C:\datasets\pothole_eval_images ^
-  --output evaluation_results.json
+yolo detect val ^
+  model="data/models/pothole_yolov8n.pt" ^
+  data="C:\UBB\THESIS\DATASET\data.yaml" ^
+  split=test ^
+  imgsz=416 ^
+  device=cpu ^
+  workers=0
 \end{verbatim}
 
-This script records, for each image, whether a pothole was detected, the confidence score, and the predicted bounding box. The resulting JSON file can then be summarized in the thesis or used to manually inspect mistakes.
-
-Table~\ref{tab:detector_evaluation_status} distinguishes the detector-related checks that are already covered by the prototype from the benchmark that should be completed after training a final checkpoint.
+The final validation and test metrics are shown in Table~\ref{tab:yolo_detector_metrics}. The test set contains 149 images and 511 pothole instances. The results indicate that the model learned the class well enough for a prototype: the \texttt{mAP@0.5} score is high, while the stricter \texttt{mAP@0.5:0.95} score is lower because potholes have irregular shapes and are difficult to localize with perfectly tight rectangular boxes.
 
 \begin{table}[htbp]
 \centering
-\begin{tabular}{>{\raggedright\arraybackslash}p{0.26\linewidth} >{\raggedright\arraybackslash}p{0.34\linewidth} >{\raggedright\arraybackslash}p{0.30\linewidth}}
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.20\linewidth} >{\raggedleft\arraybackslash}p{0.16\linewidth} >{\raggedleft\arraybackslash}p{0.16\linewidth} >{\raggedleft\arraybackslash}p{0.18\linewidth} >{\raggedleft\arraybackslash}p{0.20\linewidth}}
 \toprule
-\textbf{Check} & \textbf{Purpose} & \textbf{Current status} \\
+\textbf{Split} & \textbf{Precision} & \textbf{Recall} & \textbf{mAP@0.5} & \textbf{mAP@0.5:0.95} \\
 \midrule
-Detector wrapper smoke test & Verifies that the backend detection service returns a pothole-shaped response and bounding box. & Covered by automated backend tests in demo mode. \\
-End-to-end report flow & Verifies that image upload, detection, database storage, and map/dashboard visualization work together. & Covered by functional application testing. \\
-YOLO checkpoint loading & Verifies that \texttt{DETECTOR\_MODE=yolo} loads \texttt{pothole\_yolov8n.pt} from the model folder. & Supported by implementation; depends on providing a trained checkpoint. \\
-Quantitative model benchmark & Measures real detector quality on unseen pothole images. & To be completed after the final dataset and checkpoint are fixed. \\
+Validation & 0.839 & 0.843 & 0.886 & 0.549 \\
+Test & 0.855 & 0.863 & 0.908 & 0.572 \\
 \bottomrule
 \end{tabular}
-\caption{Detector evaluation coverage and remaining benchmark work.}
-\label{tab:detector_evaluation_status}
+\caption{YOLOv8n pothole detector metrics after 50 training epochs.}
+\label{tab:yolo_detector_metrics}
 \end{table}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.72\textwidth]{figures/yolov8n_confusion_matrix.png}
+    \caption{Confusion matrix for the trained pothole detector.}
+    \label{fig:yolov8_confusion_matrix}
+\end{figure}
+
+After the model was trained, a confidence sweep was performed at IoU 0.5. The purpose was to choose a threshold that fits the application, not only the benchmark. A low threshold detects more potholes, but it may create false civic reports. A high threshold creates fewer false positives, but it can miss real potholes. The calibration was first selected on the validation split and then checked on the test split.
+
+The backend script used for this step is:
+
+\begin{verbatim}
+python scripts/calibrate_confidence_threshold.py ^
+  --model data/models/pothole_yolov8n.pt ^
+  --dataset-root C:\UBB\THESIS\DATASET ^
+  --split valid ^
+  --imgsz 416 ^
+  --device cpu
+\end{verbatim}
+
+The validation sweep is shown in Table~\ref{tab:confidence_calibration_valid}. The balanced F1 point was \texttt{conf=0.40}. The calibration step first identified \texttt{conf=0.55} as the highest-recall threshold on the validation split with precision above 0.90. During field testing, the runtime application threshold was then raised to \texttt{0.65} to reduce false positive civic reports from non-road objects. This choice favors fewer false reports in the CitySense database.
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{>{\raggedleft\arraybackslash}p{0.14\linewidth} >{\raggedleft\arraybackslash}p{0.18\linewidth} >{\raggedleft\arraybackslash}p{0.18\linewidth} >{\raggedleft\arraybackslash}p{0.16\linewidth} >{\raggedleft\arraybackslash}p{0.12\linewidth} >{\raggedleft\arraybackslash}p{0.12\linewidth}}
+\toprule
+\textbf{Conf.} & \textbf{Precision} & \textbf{Recall} & \textbf{F1} & \textbf{FP} & \textbf{FN} \\
+\midrule
+0.30 & 0.814 & 0.874 & 0.843 & 197 & 124 \\
+0.40 & 0.856 & 0.832 & 0.844 & 138 & 166 \\
+0.45 & 0.872 & 0.807 & 0.838 & 117 & 191 \\
+0.50 & 0.895 & 0.770 & 0.828 & 89 & 227 \\
+0.55 & 0.919 & 0.740 & 0.820 & 64 & 257 \\
+0.60 & 0.932 & 0.693 & 0.795 & 50 & 303 \\
+\bottomrule
+\end{tabular}
+\caption{Validation confidence calibration at IoU 0.5.}
+\label{tab:confidence_calibration_valid}
+\end{table}
+
+The selected calibration threshold was then checked on the held-out test split. At \texttt{conf=0.55}, the detector achieved 0.937 precision, 0.726 recall, and 0.818 F1. For comparison, \texttt{conf=0.40} achieved 0.891 precision, 0.830 recall, and 0.859 F1 on the test split. The final backend runtime uses \texttt{conf=0.65}; this stricter value is more appropriate for the actual application because a false report creates database noise and administrative work.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.60\textwidth]{figures/yolov8n_conf055_prediction.jpg}
+    \caption{Example prediction from the 0.55 calibration check before the runtime threshold was raised for field testing.}
+    \label{fig:yolov8_calibrated_prediction}
+\end{figure}
+
+The repository also contains a batch inference script for project-level inspection:
+
+\begin{verbatim}
+python scripts/evaluate_detector.py ^
+  --images C:\UBB\THESIS\DATASET\test\images ^
+  --output evaluation_results.json
+\end{verbatim}
+
+This script records, for each image, whether a pothole was detected, the confidence score, and the predicted bounding box. It is useful when inspecting individual failure cases outside the aggregate metrics.
+
+\section{Database Integration of Detector Results}
+
+The trained model does not write to the database directly. Instead, the database is updated only after the backend has completed the full validation pipeline:
+
+\begin{enumerate}[label=\arabic*.]
+  \item the uploaded file is saved in the runtime upload directory;
+  \item the YOLO detector runs with the calibrated threshold;
+  \item non-pothole labels and low-confidence detections are rejected;
+  \item the highest-confidence pothole detection is converted into a \texttt{DetectionResult};
+  \item the report service checks PostGIS for an open nearby pothole;
+  \item the database either inserts a new row or increments the upvote count of an existing row.
+\end{enumerate}
+
+The database is therefore not used for model training. Its role is operational: it stores accepted detections, their confidence score, the image path, location, status, and upvote count. This separation is important. The training dataset is a labelled computer-vision dataset, while the application database is a live reporting database.
 
 \section{Functional Test Results}
 
@@ -346,6 +450,8 @@ Open reports request & Backend returns report list & Implemented for both mobile
 Status update & Report changes to resolved & Implemented through the PATCH endpoint. \\
 Dashboard visualization & Reports appear on a map with details & Implemented through the admin page. \\
 Detector smoke test & Image is processed by the detection service & Passed through demo mode and detector wrapper tests. \\
+YOLO checkpoint integration & Backend loads \texttt{pothole\_yolov8n.pt} from the model directory & Verified with a real test image through the backend detector wrapper. \\
+Confidence calibration & Runtime threshold limits low-confidence reports & Configured as \texttt{MIN\_DETECTION\_CONFIDENCE=0.65}. \\
 \bottomrule
 \end{tabular}
 \caption{Main functional tests performed for the application.}
@@ -358,4 +464,4 @@ From the practical implementation, several conclusions became clear.
 
 First, the project works best when the scope is kept narrow. Supporting only potholes made the detector contract, the database schema, and the user interface much easier to manage. Second, the geospatial merge logic adds real value because it avoids clutter and gives the administrator a better priority signal. Third, even a simple dashboard is enough to make the stored reports operationally useful.
 
-There are also limitations. The current prototype does not include authentication, push notifications, or a final quantitative benchmark for a custom-trained pothole checkpoint. However, the thesis now defines the training and evaluation path needed for that checkpoint, and the application already demonstrates the complete loop from report creation to issue resolution, which was the main goal of the project.
+There are also limitations. The current prototype does not include authentication, push notifications, municipality-specific work orders, or a multi-class damage taxonomy. The trained detector is also limited to the visual domain of the available pothole dataset. However, the project now includes a real YOLOv8 checkpoint, a documented training run, quantitative validation and test metrics, and a calibrated threshold connected to the backend runtime configuration. This makes the application more than a UI prototype: it demonstrates the complete loop from image capture to model inference, database insertion or merging, map visualization, and administrative resolution.

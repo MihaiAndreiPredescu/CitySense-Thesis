@@ -17,7 +17,9 @@ def _demo_settings(tmp_path: Path) -> Settings:
         model_path=tmp_path / "pothole_yolov8n.pt",
         upload_dir=tmp_path / "uploads",
         duplicate_radius_meters=10.0,
-        min_detection_confidence=0.35,
+        min_detection_confidence=0.55,
+        detector_image_size=416,
+        detector_iou_threshold=0.50,
         cors_origins=("*",),
     )
 

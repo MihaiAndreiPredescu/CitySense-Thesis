@@ -44,3 +44,6 @@ class HealthResponse(BaseModel):
     model_path: str
     upload_dir: str
     duplicate_radius_meters: float
+    min_detection_confidence: float
+    detector_image_size: int
+    detector_iou_threshold: float

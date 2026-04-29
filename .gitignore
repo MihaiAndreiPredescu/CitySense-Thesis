@@ -8,6 +8,12 @@ Desktop.ini
 # Ignore legacy template workspace that is not part of the deliverable
 UBB-CS Theses/
 
+# Local training data and smoke-test artifacts
+DATASET/
+runs/
+yolov8n.pt
+citysense_*_check.png
+
 # Python / FastAPI
 __pycache__/
 *.py[cod]
@@ -26,6 +32,7 @@ CitySense_Project/backend/venv/
 CitySense_Project/backend/data/uploads/
 CitySense_Project/backend/data/models/*.pt
 CitySense_Project/backend/data/models/*.onnx
+!CitySense_Project/backend/data/models/pothole_yolov8n.pt
 CitySense_Project/backend/runs/
 CitySense_Project/backend/datasets/
 

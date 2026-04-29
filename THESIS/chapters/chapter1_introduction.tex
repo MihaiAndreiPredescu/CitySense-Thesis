@@ -40,9 +40,11 @@ The contributions of the thesis are primarily engineering-oriented rather than a
 
 \begin{itemize}
   \item an end-to-end software prototype that connects mobile capture, REST communication, object detection, and geospatial duplicate handling;
+  \item a fine-tuned YOLOv8n pothole detector integrated into the backend runtime;
   \item a report data model that explicitly separates issue type, geographic position, capture time, status, and priority;
   \item a duplicate-merging workflow that turns repeated reports into upvotes instead of redundant database rows;
   \item an offline queue and idempotent retry workflow that prevents queued reports from being lost or counted twice;
+  \item a documented confidence calibration step that reduces false positive reports before database insertion;
   \item an operational dashboard that links geographic context with report status and upvote counts;
   \item a reproducible monorepo structure that keeps implementation and thesis artifacts synchronized.
 \end{itemize}

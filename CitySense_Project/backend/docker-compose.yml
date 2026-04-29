@@ -28,10 +28,12 @@ services:
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-citysense}
       DATABASE_URL: postgresql+psycopg2://postgres:${POSTGRES_PASSWORD:-citysense}@db:5432/citysense
-      DETECTOR_MODE: ${DETECTOR_MODE:-demo}
+      DETECTOR_MODE: ${DETECTOR_MODE:-yolo}
       MODEL_PATH: /app/data/models/pothole_yolov8n.pt
       DUPLICATE_RADIUS_METERS: ${DUPLICATE_RADIUS_METERS:-10}
-      MIN_DETECTION_CONFIDENCE: ${MIN_DETECTION_CONFIDENCE:-0.35}
+      MIN_DETECTION_CONFIDENCE: ${MIN_DETECTION_CONFIDENCE:-0.65}
+      DETECTOR_IMAGE_SIZE: ${DETECTOR_IMAGE_SIZE:-416}
+      DETECTOR_IOU_THRESHOLD: ${DETECTOR_IOU_THRESHOLD:-0.50}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8000,http://10.0.2.2:8000}
     ports:
       - "8000:8000"

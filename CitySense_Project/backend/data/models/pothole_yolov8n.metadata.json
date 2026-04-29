@@ -1,0 +1,66 @@
+{
+  "model_file": "pothole_yolov8n.pt",
+  "architecture": "YOLOv8n detection",
+  "framework": "Ultralytics 8.4.42",
+  "training_date": "2026-04-28",
+  "source_checkpoint": "yolov8n.pt",
+  "trained_checkpoint": "CitySense_Project/backend/runs/pothole/yolov8n_cpu_50/weights/best.pt",
+  "dataset": {
+    "path": "DATASET",
+    "format": "YOLOv8 detection",
+    "classes": ["pothole"],
+    "splits": {
+      "train": {
+        "images": 1037,
+        "labels": 1037,
+        "boxes": 3515,
+        "background_images": 94
+      },
+      "valid": {
+        "images": 296,
+        "labels": 296,
+        "boxes": 988,
+        "background_images": 27
+      },
+      "test": {
+        "images": 149,
+        "labels": 149,
+        "boxes": 511,
+        "background_images": 23
+      }
+    }
+  },
+  "training": {
+    "epochs": 50,
+    "image_size": 416,
+    "batch": 8,
+    "device": "cpu",
+    "workers": 0,
+    "training_run": "CitySense_Project/backend/runs/pothole/yolov8n_cpu_50"
+  },
+  "validation_metrics_epoch_50": {
+    "precision": 0.83655,
+    "recall": 0.84436,
+    "mAP50": 0.88631,
+    "mAP50_95": 0.54894
+  },
+  "test_metrics": {
+    "precision": 0.855,
+    "recall": 0.863,
+    "mAP50": 0.908,
+    "mAP50_95": 0.572
+  },
+  "calibration": {
+    "matching_iou": 0.5,
+    "balanced_confidence": 0.40,
+    "app_confidence": 0.65,
+    "app_confidence_reason": "Raised after field testing from 0.55 to reduce false positive civic reports from non-road objects while keeping high precision."
+  },
+  "runtime": {
+    "detector_mode": "yolo",
+    "model_path": "CitySense_Project/backend/data/models/pothole_yolov8n.pt",
+    "min_detection_confidence": 0.65,
+    "detector_image_size": 416,
+    "detector_iou_threshold": 0.50
+  }
+}

@@ -20,9 +20,12 @@ def parse_args() -> argparse.Namespace:
         help="Base YOLO model checkpoint to fine-tune.",
     )
     parser.add_argument("--epochs", type=int, default=50)
-    parser.add_argument("--imgsz", type=int, default=640)
-    parser.add_argument("--project", default="runs/pothole_detector")
-    parser.add_argument("--name", default="citysense_yolov8n")
+    parser.add_argument("--imgsz", type=int, default=416)
+    parser.add_argument("--batch", type=int, default=8)
+    parser.add_argument("--device", default="cpu")
+    parser.add_argument("--workers", type=int, default=0)
+    parser.add_argument("--project", default="runs/pothole")
+    parser.add_argument("--name", default="yolov8n_cpu_50")
     return parser.parse_args()
 
 
@@ -36,6 +39,9 @@ def main() -> None:
         data=args.data,
         epochs=args.epochs,
         imgsz=args.imgsz,
+        batch=args.batch,
+        device=args.device,
+        workers=args.workers,
         project=args.project,
         name=args.name,
     )

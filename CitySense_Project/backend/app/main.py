@@ -90,6 +90,9 @@ def healthcheck() -> HealthResponse:
         model_path=str(settings.model_path),
         upload_dir=str(settings.upload_dir),
         duplicate_radius_meters=settings.duplicate_radius_meters,
+        min_detection_confidence=settings.min_detection_confidence,
+        detector_image_size=settings.detector_image_size,
+        detector_iou_threshold=settings.detector_iou_threshold,
     )
 
 

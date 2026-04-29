@@ -26,6 +26,8 @@ class Settings:
     upload_dir: Path
     duplicate_radius_meters: float
     min_detection_confidence: float
+    detector_image_size: int
+    detector_iou_threshold: float
     cors_origins: tuple[str, ...]
 
 
@@ -56,7 +58,9 @@ def get_settings() -> Settings:
         ),
         duplicate_radius_meters=float(os.getenv("DUPLICATE_RADIUS_METERS", "10")),
         min_detection_confidence=float(
-            os.getenv("MIN_DETECTION_CONFIDENCE", "0.35")
+            os.getenv("MIN_DETECTION_CONFIDENCE", "0.65")
         ),
+        detector_image_size=int(os.getenv("DETECTOR_IMAGE_SIZE", "416")),
+        detector_iou_threshold=float(os.getenv("DETECTOR_IOU_THRESHOLD", "0.50")),
         cors_origins=_split_csv(os.getenv("CORS_ORIGINS")),
     )

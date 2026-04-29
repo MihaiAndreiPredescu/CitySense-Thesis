@@ -53,8 +53,12 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _openDetails(IssueReport report) {
-    showDialog<void>(
+    showModalBottomSheet<void>(
       context: context,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.42),
+      isScrollControlled: true,
+      useSafeArea: true,
       builder: (_) => ReportDetailsSheet(report: report),
     );
   }

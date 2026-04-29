@@ -60,6 +60,8 @@ class PotholeDetector:
         results = model(
             str(image_path),
             conf=self._settings.min_detection_confidence,
+            imgsz=self._settings.detector_image_size,
+            iou=self._settings.detector_iou_threshold,
             verbose=False,
         )
 

@@ -13,7 +13,7 @@ CitySense is a pothole-first civic reporting platform developed as a Computer Sc
 - Photo-based pothole reporting from a Flutter mobile app
 - Automatic geolocation capture and upload
 - Offline report queue on the phone with captured timestamp, location, and automatic sync when the backend becomes reachable
-- YOLO-based pothole detection with a documented demo fallback for local UI smoke tests
+- YOLOv8n pothole detection with calibrated confidence filtering and a documented demo fallback for local UI smoke tests
 - PostGIS duplicate detection inside a 10 meter radius
 - Upvote-based merging of repeated reports
 - Admin dashboard with a map, report list, status filter, and resolve actions
@@ -81,13 +81,16 @@ The backend supports two detector modes:
 
 The default code path is the real YOLO-based detector. The demo mode is included only to keep the rest of the stack testable while training assets are prepared.
 
-## Training and evaluation assets
+## Training, calibration, and evaluation assets
 
 - Place trained weights in `CitySense_Project/backend/data/models/pothole_yolov8n.pt`
 - Use `CitySense_Project/backend/scripts/train_pothole_detector.py` to fine-tune a model on an RDD2022-style dataset
+- Use `CitySense_Project/backend/scripts/calibrate_confidence_threshold.py` to sweep confidence thresholds against labelled YOLO splits
 - Use `CitySense_Project/backend/scripts/evaluate_detector.py` to run batch inference over a local evaluation folder
+
+The integrated thesis checkpoint uses `MIN_DETECTION_CONFIDENCE=0.65`, `DETECTOR_IMAGE_SIZE=416`, and `DETECTOR_IOU_THRESHOLD=0.50`.
 
 ## Notes
 
-- Generated LaTeX artifacts, model weights, uploaded images, virtual environments, and build outputs are ignored by git.
+- Generated LaTeX artifacts, raw datasets, training runs, uploaded images, virtual environments, and build outputs are ignored by git. The final thesis YOLO checkpoint in `CitySense_Project/backend/data/models/pothole_yolov8n.pt` is tracked so the default YOLO backend can run from the repository.
 - The legacy `CitySense_Project` history has been preserved and attached to this monorepo.

@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../models/report_submission_result.dart';
+import '../services/citysense_api_client.dart';
 import '../services/location_service.dart';
 import '../services/report_sync_service.dart';
 import '../widgets/report_status_card.dart';
@@ -73,12 +74,75 @@ class _ReportScreenState extends State<ReportScreen> {
         _statusMessage = outcome.message;
       });
     } catch (error) {
+      final rejectionMessage = _photoRejectionMessage(error);
+      if (rejectionMessage != null) {
+        setState(() {
+          _isSubmitting = false;
+          _lastSubmission = null;
+          _lastSubmissionQueued = false;
+          _statusMessage = rejectionMessage;
+        });
+
+        await _showNoPotholeDialog(rejectionMessage);
+        if (!mounted) {
+          return;
+        }
+
+        setState(() {
+          _imageFile = null;
+          _statusMessage =
+              'No report was created. Take another photo when the pothole is clearly visible.';
+        });
+        return;
+      }
+
       setState(() {
         _isSubmitting = false;
         _lastSubmissionQueued = false;
         _statusMessage = error.toString();
       });
     }
+  }
+
+  String? _photoRejectionMessage(Object error) {
+    if (error is! CitySenseApiException || error.isRetryable) {
+      return null;
+    }
+
+    final message = error.message.toLowerCase();
+    final isDetectionRejection =
+        error.statusCode == 422 &&
+        (message.contains('pothole') || message.contains('detected'));
+    if (!isDetectionRejection) {
+      return null;
+    }
+
+    return 'CitySense did not find a pothole in this photo. The photo was not saved as a report. Please retake it with the pothole clearly visible.';
+  }
+
+  Future<void> _showNoPotholeDialog(String message) async {
+    if (!mounted) {
+      return;
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: const Icon(
+          Icons.search_off_outlined,
+          color: Color(0xFFD96C1A),
+          size: 36,
+        ),
+        title: const Text('No pothole detected'),
+        content: Text(message),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Retake photo'),
+          ),
+        ],
+      ),
+    );
   }
 
   String _formatDateTime(DateTime value) {

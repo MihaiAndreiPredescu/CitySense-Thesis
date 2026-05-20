@@ -228,7 +228,7 @@ This rule is easy to explain, easy to implement, and easy to test. It is also in
 
 \section{Administrator Dashboard}
 
-The administrator dashboard was implemented as a lightweight web page served by the backend. It uses Leaflet and OpenStreetMap tiles and provides a report list, a map with report markers, report details such as confidence and upvotes, the date and time when the last photo report was taken, a filter by report status, and a button for marking reports as resolved. The page also refreshes periodically and when it becomes visible again, so reports synchronized from the phone appear on the dashboard without requiring a manual refresh.
+The administrator dashboard was implemented as a lightweight web page served by the backend. It uses Leaflet and OpenStreetMap tiles and provides a report list, a map with report markers, report details such as confidence and upvotes, the date and time when the last photo report was taken, a filter by report status, and a button for marking reports as resolved. The map and list are connected in both directions: the report card can focus the map on its location, while clicking a marker opens the popup, scrolls the left-side list to the same report, and highlights that card. The page also refreshes periodically and when it becomes visible again, so reports synchronized from the phone appear on the dashboard without requiring a manual refresh.
 
 The dashboard is shown in Figure~\ref{fig:admin_dashboard}. I kept the design simple on purpose. For this prototype, the important point was to show that the backend data can be consumed by an administrative interface and that the report lifecycle can be closed when an issue is solved.
 
@@ -376,7 +376,7 @@ Offline verification alert & User is told whether a queued photo was accepted or
 Repeated client report ID & Backend does not count the same client submission twice & Implemented through the client submission receipt table. \\
 Open reports request & Backend returns report list & Implemented for both mobile app and dashboard. \\
 Status update & Report changes to resolved & Implemented through the PATCH endpoint. \\
-Dashboard visualization & Reports appear on a map with details & Implemented through the admin page with periodic auto-refresh. \\
+Dashboard visualization & Reports appear on a map with details, and marker selection identifies the same report in the left list & Implemented through the admin page with marker popups, list scrolling, card highlighting, and periodic auto-refresh. \\
 Detector smoke test & Image is processed by the detection service & Passed through demo mode and detector wrapper tests. \\
 YOLO checkpoint integration & Backend loads \texttt{pothole\_yolov8n.pt} from the model directory & Verified with a real test image through the backend detector wrapper. \\
 Confidence calibration & Runtime threshold limits low-confidence reports & Configured as \texttt{MIN\_DETECTION\_CONFIDENCE=0.65}. \\

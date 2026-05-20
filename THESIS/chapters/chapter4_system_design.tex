@@ -41,7 +41,7 @@ FR5 & The backend must store reports in a database together with their location,
 FR6 & The backend must detect whether a report is a duplicate of an already open pothole within a radius of 10 meters. \\
 FR7 & If a duplicate exists, the backend must merge the report by incrementing the upvote count instead of inserting a new row. \\
 FR8 & The mobile application must provide a map view for synchronized open reports and locally queued reports, and show a detail sheet when a marker is selected. \\
-FR9 & The administrative dashboard must show stored reports on a map together with metadata such as status, upvotes, and the date and time of the last photo report. \\
+FR9 & The administrative dashboard must show stored reports on a map together with metadata such as status, upvotes, and the date and time of the last photo report, and selecting a marker must bring the corresponding report into view in the left-side list. \\
 FR10 & The administrative dashboard must allow the administrator to mark a report as resolved. \\
 FR11 & The mobile application must save reports locally when the backend is unreachable and synchronize them automatically when the backend becomes reachable again. \\
 FR12 & The mobile application must inform the user when an offline photo is later accepted as a pothole or rejected by the backend detector. \\
@@ -98,7 +98,7 @@ The actor is the citizen user or administrator. In the main flow, the user opens
 
 \subsection{Use Case 3: Resolve a Report}
 
-The actor is the administrator. In the main flow, the administrator opens the dashboard and filters or selects a report. The status is changed from \texttt{OPEN} to \texttt{RESOLVED}, and the map and report list are refreshed. The postcondition is that the resolved issue no longer appears in the default open-report view.
+The actor is the administrator. In the main flow, the administrator opens the dashboard and filters or selects a report. Selecting a marker on the map opens its popup and moves the left-side report list to the same report, where the matching card is highlighted. The administrator can also use the report card to focus the map on that location. The status is then changed from \texttt{OPEN} to \texttt{RESOLVED}, and the map and report list are refreshed. The postcondition is that the resolved issue no longer appears in the default open-report view.
 
 \section{Data Specification}
 

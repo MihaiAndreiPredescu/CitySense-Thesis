@@ -61,6 +61,16 @@ class OfflineReportRepository {
     return rows.map(OfflineReport.fromMap).toList();
   }
 
+  Future<List<OfflineReport>> queuedReports() async {
+    final rows = await (await _db).query(
+      _tableName,
+      where: 'state IN (?, ?)',
+      whereArgs: [_pendingState, _failedState],
+      orderBy: 'queued_at ASC',
+    );
+    return rows.map(OfflineReport.fromMap).toList();
+  }
+
   Future<int> pendingCount() async {
     return _countWhereState(_pendingState);
   }

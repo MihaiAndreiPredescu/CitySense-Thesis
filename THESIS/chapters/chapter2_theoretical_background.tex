@@ -14,7 +14,7 @@ Mobile client & Flutter & Provides the citizen-facing interface, camera access, 
 Backend API & FastAPI & Exposes REST endpoints, validates requests, and coordinates report processing. \\
 Object detection & YOLO & Analyzes submitted images and returns pothole-oriented predictions. \\
 Spatial data & PostgreSQL + PostGIS & Stores reports and supports distance-based duplicate detection. \\
-Map rendering & OpenStreetMap + Leaflet & Supplies the geographic context used in mobile and admin map views. \\
+Map rendering & OpenStreetMap + \texttt{flutter\_map} + Leaflet & Supplies the geographic context used in mobile and admin map views. \\
 \bottomrule
 \end{tabular}
 \caption{Main theoretical components used by the CitySense project.}
@@ -85,7 +85,7 @@ This design is better than exact coordinate matching. Two users standing on diff
 
 The last theoretical topic in this chapter is map visualization. A pothole report without geographic context is not very useful. Administrators need to know where the issue is located, and users benefit from seeing whether a problem has already been reported.
 
-CitySense uses OpenStreetMap as the geographic base layer \cite{openstreetmap}. On the web side, the map is rendered with Leaflet \cite{leaflet_docs}. On the mobile side, Flutter map widgets are used to display the same kind of tile-based geographic information. The advantage of this approach is that the whole system shares a common visual model of the city map.
+CitySense uses OpenStreetMap as the geographic base layer \cite{openstreetmap}. On the web side, the map is rendered with Leaflet \cite{leaflet_docs}. On the mobile side, the app uses the \texttt{flutter\_map} package to display the same kind of tile-based geographic information. The mobile implementation also keeps a small application-side tile cache. This means that tiles previously loaded while online can still be shown when the phone is offline. When no real tile has been cached for a location, the app displays a simple generated basemap background rather than leaving the local report marker floating on an empty screen. The advantage of this approach is that the whole system shares a common visual model of the city map while remaining usable during temporary loss of connectivity.
 
 \begin{figure}[htbp]
 \centering

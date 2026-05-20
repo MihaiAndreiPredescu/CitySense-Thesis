@@ -25,7 +25,7 @@ Map rendering & OpenStreetMap + \texttt{flutter\_map} + Leaflet & Supplies the g
 
 The first important topic is mobile development. In this type of application the phone is the main interface between the citizen and the system. Because of that, the application has to be simple, responsive, and able to access hardware components such as the camera and GPS sensor.
 
-For this project I chose Flutter \cite{flutter_docs}. Flutter allows the developer to write one codebase in Dart and compile it to multiple platforms. Even though the current version of CitySense is Android-first, using Flutter was still a good choice because it reduced development time and kept the user interface code organized. Another advantage is that the framework already has mature packages for camera access, maps, geolocation, and HTTP communication.
+For this project I chose Flutter \cite{flutter_docs}. Flutter allows the developer to write one codebase in Dart and compile it to multiple platforms. Even though the current version of CitySense is Android-first, using Flutter was still a good choice because it reduced development time and kept the user interface code organized. A native Android application would have been appropriate for a strictly Android-only product, but Flutter offered a better balance for a thesis prototype: the implementation could still be tested on Android while keeping the door open for a future iOS version. Another advantage is that the framework already has mature packages for camera access, maps, geolocation, local storage, and HTTP communication.
 
 From a software engineering point of view, Flutter is also convenient because it encourages a component-based user interface. The interface is built from widgets, and each widget has a specific role. In CitySense, this was useful when separating the report flow from the map flow. One screen is responsible for taking the photo and submitting the report, while another screen is responsible for showing already reported issues.
 
@@ -41,7 +41,7 @@ Citizen reporting applications usually fail when they ask too much from the user
 
 The second theoretical topic is backend communication. The mobile app does not store the reports locally as the main source of truth. Instead, it sends them to a backend service. This is a common client-server architecture, where the mobile app is responsible for collecting input, and the backend is responsible for validation, persistence, and business logic.
 
-FastAPI \cite{fastapi_docs} was chosen as the backend framework because it is lightweight, expressive, and well suited for JSON-based APIs. It supports request validation through schemas, integrates cleanly with Python code, and is easy to document. For CitySense, this matters because the endpoints are few but important: one endpoint reports the health status of the backend, one endpoint sends a report with image and coordinates, one endpoint lists reports, and one endpoint changes the status of a report.
+FastAPI \cite{fastapi_docs} was chosen as the backend framework because it is lightweight, expressive, and well suited for JSON-based APIs. It supports request validation through schemas, integrates cleanly with Python code, and is easy to document. For CitySense, this matters because the endpoints are few but important: one endpoint reports the health status of the backend, one endpoint sends a report with image and coordinates, one endpoint lists reports, and one endpoint changes the status of a report. A larger framework would be useful for a broader municipal platform with accounts, permissions, and complex administrative workflows, but the current backend benefits more from a small and explicit service boundary.
 
 The backend also has to deal with multipart uploads because the mobile app sends image files, not only JSON text. This is another reason why a clear REST framework is useful. The backend can validate types, return informative errors, and expose a consistent response structure to both the mobile client and the admin dashboard.
 
@@ -53,7 +53,7 @@ In a project of this size, separation of concerns is important. The detection lo
 
 The computer vision component of the thesis is based on object detection. Unlike image classification, which only says what is present in an image, object detection also estimates where the object is located. This is useful for road-damage analysis because the system should not only say that a photo is related to a pothole, but also identify the relevant region in the image.
 
-The original YOLO family became popular because it treats detection as a single-stage task \cite{redmon2016yolo}. Instead of generating regions first and classifying them later, the model predicts classes and bounding boxes in one forward pass. This makes YOLO practical for real-time or near-real-time scenarios.
+The original YOLO family became popular because it treats detection as a single-stage task \cite{redmon2016yolo}. Instead of generating regions first and classifying them later, the model predicts classes and bounding boxes in one forward pass. This makes YOLO practical for real-time or near-real-time scenarios and explains why it fits better than a heavier detector when the goal is to support a responsive reporting workflow rather than to study a new computer vision architecture.
 
 The implementation in CitySense uses Ultralytics YOLO \cite{jocher2023ultralytics}. In simplified terms, the detector returns three important things: a class label, a confidence score, and the coordinates of a predicted bounding box.
 
@@ -69,7 +69,7 @@ Another practical concept is the confidence threshold. A detector usually return
 
 \section{Spatial Databases and Geographical Queries}
 
-PostgreSQL is widely used for structured relational data \cite{postgres_docs}. For CitySense, however, standard relational columns are not enough because location is central to the business logic. The project therefore uses PostGIS \cite{obe2021postgis}, which extends PostgreSQL with spatial types and spatial functions.
+PostgreSQL is widely used for structured relational data \cite{postgres_docs}. For CitySense, however, standard relational columns are not enough because location is central to the business logic. The project therefore uses PostGIS \cite{obe2021postgis}, which extends PostgreSQL with spatial types and spatial functions. This is an important distinction from simply storing latitude and longitude as two numeric fields: the database must be able to reason about distance in a reliable and indexable way.
 
 The key idea is that a location should not be treated only as two unrelated numbers. If latitude and longitude are stored as a true geographic point, then the database can answer practical spatial queries, such as whether an open issue exists near a given position, how far apart two reports are, and which reports fall inside a selected area.
 

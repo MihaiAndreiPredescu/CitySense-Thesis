@@ -30,23 +30,41 @@ It is important to state clearly that this thesis is not a pure machine learning
 
 \section{Technology Choice Rationale}
 
-After looking at existing work, the next step is to explain why the final stack was chosen. The reason is mostly practical: each technology solves one concrete problem in the project.
+After looking at existing work, the next step is to explain why the final stack was chosen. The choices were not made only because the technologies are popular, but because each one fits a specific constraint of the project: short citizen interaction, reliable image upload, automatic pothole validation, geographic duplicate detection, offline tolerance, and a backend that can be demonstrated locally. I therefore compared the chosen stack with realistic alternatives and kept the options that solved the current problem without making the prototype unnecessarily broad.
 
 \subsection{Choice of Flutter}
 
-Flutter was chosen because it made it possible to build the application UI quickly, use the camera and GPS packages from one codebase, and keep the project structured around screens and reusable widgets. Since the target was a demonstrable prototype and not a full production rollout, development speed was an important factor.
+Flutter was chosen because it made it possible to build the application UI quickly, use camera and GPS packages from one codebase, and keep the project structured around screens and reusable widgets. A native Android implementation in Kotlin would also have been a strong option, especially because the prototype is Android-first. However, it would have tied the user interface more tightly to one platform and would have made a later iOS version require a separate implementation. React Native was another possible cross-platform choice, but for this project Flutter offered a more consistent widget-based UI model and a direct development workflow for a small application with maps, camera access, and local storage.
+
+The choice of Flutter therefore does not contradict the Android-first scope. Android is the tested and demonstrated platform, while Flutter keeps the mobile code organized and leaves a realistic path toward another platform if the prototype is extended later. Since the target was a demonstrable prototype and not a full production rollout, development speed and predictable UI structure were important factors.
 
 \subsection{Choice of FastAPI}
 
-FastAPI was chosen because the backend only needed a focused API, not a heavy enterprise framework. It is well suited for handling file uploads, JSON responses, and small but clear schemas. This keeps the code easier to understand, maintain, and extend.
+FastAPI was chosen because the backend needed a focused API, not a large enterprise framework. The main backend responsibilities are to receive multipart image uploads, validate coordinates and timestamps, call the detector, apply duplicate logic, and return JSON responses. FastAPI fits this shape well because it is lightweight, schema-oriented, and integrates naturally with Python code, which is also the language used by the object-detection tooling.
+
+The main alternatives were Flask and Django. Flask would have been simple, but more of the validation, request schema, and API documentation behavior would have had to be assembled manually. Django would have provided many built-in features such as a full ORM, authentication, and an administrative interface, but those features would have added weight that the prototype does not yet need. CitySense has only a few important endpoints, so FastAPI offered the best balance between clarity, validation support, and low framework overhead.
 
 \subsection{Choice of PostgreSQL and PostGIS}
 
-A simple relational database would not be enough because distance-based queries are central to the project. PostgreSQL with PostGIS offers both traditional relational storage and spatial operations in the same system. This made it a natural fit for report storage and duplicate detection.
+A simple relational database would not be enough because distance-based queries are central to the project. PostgreSQL with PostGIS offers both traditional relational storage and spatial operations in the same system. This made it a natural fit for report storage and duplicate detection: the same database can store report status, confidence values, image paths, upvotes, client submission receipts, and true geographic points.
+
+SQLite was considered differently for the two sides of the system. It is a good fit on the phone, where the offline queue belongs to one user and stores a small amount of local state. It would be a weaker fit as the backend database because CitySense needs a shared server-side source of truth, concurrent requests from multiple users, durable report history, and spatial queries expressed in meters rather than approximate manual calculations over latitude and longitude columns. Storing coordinates as plain numbers and checking distances in application code would make duplicate detection harder to index, easier to implement incorrectly, and less transparent to explain.
+
+Other server-side alternatives were also possible. A NoSQL database could store report objects, but the project is naturally relational: reports have status, timestamps, locations, counters, and idempotent client submission records. MySQL or MariaDB could cover some relational needs, but PostGIS is a mature and widely used spatial extension with direct support for functions such as \texttt{ST\_DWithin}. Because duplicate merging is one of the core contributions of the system, choosing PostgreSQL with PostGIS keeps the geographic logic close to the data and avoids treating location as an afterthought.
 
 \subsection{Choice of YOLO}
 
-YOLO was chosen because it offers a good balance between speed and practicality. For a backend service that may eventually process multiple images, a very heavy detection pipeline would make the user experience worse. A lightweight YOLO model is more realistic for this kind of application.
+YOLO was chosen because it offers a good balance between speed and practicality. CitySense does not need a model that only classifies an entire image as road damage or not; it also benefits from a bounding box and a confidence score, because these make the detector output easier to inspect and calibrate. At the same time, the system does not need pixel-level segmentation, since the backend stores a civic report rather than a detailed road-surface mask.
+
+Several alternatives were less suitable for the implemented scope. A pure image-classification model would be simpler, but it would not localize the pothole region and would provide less useful evidence when inspecting detector behavior. Two-stage detectors such as Faster R-CNN and transformer-based detectors such as DETR can be accurate, but they generally introduce more computational cost and a heavier training and inference workflow. That cost matters because the backend is expected to stay responsive and the final training run was performed in a CPU-only environment. Larger detection models could also have been used, but they would make the prototype harder to run locally without changing the main system contribution.
+
+For these reasons, a lightweight YOLO variant was a practical compromise. It is fast enough for a backend service, widely supported by tooling, easy to fine-tune on a pothole dataset, and expressive enough for the single-class detection task used in CitySense.
+
+\subsection{Choice of Map Technologies}
+
+CitySense uses OpenStreetMap as the base map, \texttt{flutter\_map} on the mobile side, and Leaflet on the web dashboard. This combination was chosen because it gives the mobile application and the dashboard the same visual model of geographic data while keeping the implementation lightweight.
+
+Commercial map SDKs such as Google Maps or Mapbox would also have been possible, and they offer strong developer tooling. However, they usually introduce API keys, account configuration, pricing considerations, and a larger dependency on an external provider. For a thesis prototype that needs to be reproducible and easy to demonstrate, OpenStreetMap with Leaflet and \texttt{flutter\_map} is more appropriate. It also works well with the offline tile-cache behavior implemented in the mobile application, where previously loaded map tiles can remain visible when the backend network is unavailable.
 
 \begin{table}[htbp]
 \centering

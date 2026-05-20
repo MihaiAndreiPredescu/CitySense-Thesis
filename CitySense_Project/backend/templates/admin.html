@@ -124,6 +124,18 @@
       border: 1px solid var(--border);
       background: white;
       box-shadow: 0 10px 30px rgba(36, 23, 14, 0.06);
+      outline: 3px solid transparent;
+      outline-offset: 2px;
+      transition:
+        border-color 0.2s ease,
+        box-shadow 0.2s ease,
+        outline-color 0.2s ease;
+    }
+
+    .report-card.is-selected {
+      border-color: var(--accent);
+      box-shadow: 0 14px 34px rgba(159, 67, 0, 0.16);
+      outline-color: rgba(217, 108, 26, 0.24);
     }
 
     .report-card h2 {
@@ -191,6 +203,12 @@
       color: var(--muted);
     }
 
+    .refresh-status {
+      margin: 2px 0 0;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
     @media (max-width: 1024px) {
       .layout {
         grid-template-columns: 1fr;
@@ -224,6 +242,7 @@
           <option value="ALL">All reports</option>
         </select>
         <button id="refreshButton" type="button">Refresh reports</button>
+        <p id="lastUpdated" class="refresh-status">Waiting for first refresh.</p>
       </div>
 
       <div class="stats">
@@ -259,9 +278,12 @@
     const emptyState = document.getElementById("emptyState");
     const totalReports = document.getElementById("totalReports");
     const totalUpvotes = document.getElementById("totalUpvotes");
+    const lastUpdated = document.getElementById("lastUpdated");
 
     const map = L.map("map").setView([46.770439, 23.591423], 13);
     let markersLayer = L.layerGroup().addTo(map);
+    let fetchInFlight = false;
+    let selectedReportId = null;
 
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
@@ -321,6 +343,43 @@
       }
     }
 
+    function findReportCard(reportId) {
+      return Array.from(reportList.children).find(
+        (card) => card.dataset.reportId === reportId
+      );
+    }
+
+    function highlightSelectedReport() {
+      reportList.querySelectorAll(".report-card").forEach((card) => {
+        const isSelected = card.dataset.reportId === selectedReportId;
+        card.classList.toggle("is-selected", isSelected);
+
+        if (isSelected) {
+          card.setAttribute("aria-current", "true");
+        } else {
+          card.removeAttribute("aria-current");
+        }
+      });
+    }
+
+    function selectReportInList(reportId, { scroll = true, focus = false } = {}) {
+      selectedReportId = reportId;
+      highlightSelectedReport();
+
+      const card = findReportCard(reportId);
+      if (!card) {
+        return;
+      }
+
+      if (scroll) {
+        card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+
+      if (focus) {
+        card.focus({ preventScroll: true });
+      }
+    }
+
     function renderList(reports) {
       reportList.innerHTML = "";
       emptyState.hidden = reports.length > 0;
@@ -332,6 +391,8 @@
       for (const report of reports) {
         const card = document.createElement("article");
         card.className = "report-card";
+        card.dataset.reportId = report.id;
+        card.tabIndex = -1;
 
         const badgeClass = report.status === "RESOLVED" ? "pill resolved" : "pill";
         const imageHtml = report.image_url
@@ -364,10 +425,13 @@
         reportList.appendChild(card);
       }
 
+      highlightSelectedReport();
+
       reportList.querySelectorAll("[data-focus]").forEach((button) => {
         button.addEventListener("click", () => {
           const report = reports.find((item) => item.id === button.dataset.focus);
           if (!report) return;
+          selectReportInList(report.id, { scroll: false });
           map.setView([report.latitude, report.longitude], 18);
         });
       });
@@ -406,6 +470,10 @@
 
         markersLayer.addLayer(marker);
         bounds.push([report.latitude, report.longitude]);
+
+        marker.on("click", () => {
+          selectReportInList(report.id, { focus: true });
+        });
       });
 
       if (bounds.length === 1) {
@@ -416,18 +484,28 @@
     }
 
     async function fetchReports() {
+      if (fetchInFlight) {
+        return;
+      }
+
+      fetchInFlight = true;
       const selectedStatus = statusFilter.value;
       const query =
         selectedStatus === "ALL" ? "" : `?status=${encodeURIComponent(selectedStatus)}`;
 
-      const response = await fetch(`${apiPrefix}/reports${query}`);
-      if (!response.ok) {
-        throw new Error("Unable to load reports from the backend.");
-      }
+      try {
+        const response = await fetch(`${apiPrefix}/reports${query}`);
+        if (!response.ok) {
+          throw new Error("Unable to load reports from the backend.");
+        }
 
-      const reports = await response.json();
-      renderList(reports);
-      renderMarkers(reports);
+        const reports = await response.json();
+        renderList(reports);
+        renderMarkers(reports);
+        lastUpdated.textContent = `Last updated ${formatDateTime(new Date().toISOString())}`;
+      } finally {
+        fetchInFlight = false;
+      }
     }
 
     refreshButton.addEventListener("click", async () => {
@@ -440,12 +518,20 @@
     });
 
     statusFilter.addEventListener("change", fetchReports);
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) {
+        fetchReports().catch((error) => console.error(error));
+      }
+    });
 
     fetchReports().catch((error) => {
       console.error(error);
       emptyState.hidden = false;
       emptyState.textContent = error.message;
     });
+    setInterval(() => {
+      fetchReports().catch((error) => console.error(error));
+    }, 15000);
   </script>
 </body>
 </html>

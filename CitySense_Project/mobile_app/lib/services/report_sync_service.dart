@@ -26,6 +26,22 @@ class OfflineSubmissionOutcome {
   final String message;
 }
 
+class OfflineReportVerification {
+  OfflineReportVerification({
+    required this.clientReportId,
+    required this.accepted,
+    required this.title,
+    required this.message,
+    this.imageBytes,
+  });
+
+  final String clientReportId;
+  final bool accepted;
+  final String title;
+  final String message;
+  final Uint8List? imageBytes;
+}
+
 class ReportSyncService extends ChangeNotifier {
   ReportSyncService({
     required this.apiClient,
@@ -39,16 +55,30 @@ class ReportSyncService extends ChangeNotifier {
   final Connectivity _connectivity;
 
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+  Timer? _retryTimer;
   bool _isStarted = false;
   bool _isSyncing = false;
   int _pendingCount = 0;
   int _failedCount = 0;
   String? _lastSyncMessage;
+  final List<OfflineReportVerification> _offlineVerifications = [];
 
   bool get isSyncing => _isSyncing;
   int get pendingCount => _pendingCount;
   int get failedCount => _failedCount;
   String? get lastSyncMessage => _lastSyncMessage;
+
+  Future<List<OfflineReport>> queuedReports() {
+    return repository.queuedReports();
+  }
+
+  List<OfflineReportVerification> takeOfflineVerifications() {
+    final verifications = List<OfflineReportVerification>.of(
+      _offlineVerifications,
+    );
+    _offlineVerifications.clear();
+    return verifications;
+  }
 
   Future<void> start() async {
     if (_isStarted) {
@@ -62,6 +92,11 @@ class ReportSyncService extends ChangeNotifier {
       results,
     ) {
       if (_hasNetwork(results)) {
+        unawaited(syncPendingReports());
+      }
+    });
+    _retryTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (_pendingCount > 0 && !_isSyncing) {
         unawaited(syncPendingReports());
       }
     });
@@ -149,8 +184,16 @@ class ReportSyncService extends ChangeNotifier {
 
       var sentCount = 0;
       for (final report in pending) {
+        final imageBytes = await _readReportImage(report);
         try {
-          await _submitQueuedReport(report);
+          final submission = await _submitQueuedReport(report);
+          _addOfflineVerification(
+            clientReportId: report.clientReportId,
+            accepted: true,
+            title: 'Pothole confirmed',
+            message: _acceptedOfflineMessage(submission),
+            imageBytes: imageBytes,
+          );
           sentCount += 1;
         } on CitySenseApiException catch (error) {
           if (error.isRetryable) {
@@ -166,6 +209,14 @@ class ReportSyncService extends ChangeNotifier {
           await repository.deleteReport(report.clientReportId);
           _lastSyncMessage =
               'A saved report was not accepted: ${error.message}';
+          _addOfflineVerification(
+            clientReportId: report.clientReportId,
+            accepted: false,
+            title: 'No pothole detected',
+            message:
+                'The offline photo was checked by the backend, but CitySense did not detect a pothole. No report was added to the map or dashboard.\n\n${error.message}',
+            imageBytes: imageBytes,
+          );
         } catch (error) {
           await repository.markRetryableFailure(
             clientReportId: report.clientReportId,
@@ -202,6 +253,48 @@ class ReportSyncService extends ChangeNotifier {
     return submission;
   }
 
+  void _addOfflineVerification({
+    required String clientReportId,
+    required bool accepted,
+    required String title,
+    required String message,
+    Uint8List? imageBytes,
+  }) {
+    _offlineVerifications.add(
+      OfflineReportVerification(
+        clientReportId: clientReportId,
+        accepted: accepted,
+        title: title,
+        message: message,
+        imageBytes: imageBytes,
+      ),
+    );
+  }
+
+  Future<Uint8List?> _readReportImage(OfflineReport report) async {
+    try {
+      final image = File(report.imagePath);
+      if (!await image.exists()) {
+        return null;
+      }
+      return image.readAsBytes();
+    } on Object {
+      return null;
+    }
+  }
+
+  String _acceptedOfflineMessage(ReportSubmissionResult submission) {
+    final confidencePercent = (submission.report.confidence * 100).clamp(
+      0,
+      100,
+    );
+    final action = submission.deduped
+        ? 'It was merged with an existing pothole report and the dashboard priority was updated.'
+        : 'It was added as a new pothole report on the map and dashboard.';
+
+    return 'The offline photo was checked by the backend and CitySense detected a pothole with ${confidencePercent.toStringAsFixed(1)}% confidence. $action';
+  }
+
   Future<void> _refreshCounts() async {
     _pendingCount = await repository.pendingCount();
     _failedCount = await repository.failedCount();
@@ -214,6 +307,7 @@ class ReportSyncService extends ChangeNotifier {
 
   @override
   void dispose() {
+    _retryTimer?.cancel();
     unawaited(_connectivitySubscription?.cancel());
     unawaited(repository.close());
     super.dispose();

@@ -6,7 +6,7 @@ This chapter continues the practical part of the thesis. After defining the requ
 
 CitySense is organized as a client-server application with a small administrative web layer. The user-facing side is represented by the Flutter mobile application and the local offline report queue on the phone. The server side contains the FastAPI backend, the PostgreSQL/PostGIS database, the YOLO-based detection service integrated in the backend, and the administrator dashboard rendered in the browser.
 
-The flow between these components starts when the mobile app captures the image and the user location. The app stores the report locally together with the capture time and a client-generated UUID, then sends the report to the backend through the REST API when the configured backend address is reachable. The backend stores the uploaded image, runs the detector, checks for a nearby duplicate through PostGIS, and either stores or merges the report in the database. The app and the dashboard then request the list of reports and render them on a map.
+The flow between these components starts when the mobile app captures the image and the user location. The app stores the report locally together with the capture time and a client-generated UUID, then sends the report to the backend through the REST API when the configured backend address is reachable. If the backend is not reachable, the queued report is still visible on the mobile map and can be inspected from a local detail sheet. The backend stores the uploaded image, runs the detector, checks for a nearby duplicate through PostGIS, and either stores or merges the report in the database. The app and the dashboard then request the list of reports and render them on a map.
 
 This architecture was chosen because it keeps heavy logic out of the phone and makes the backend the single source of truth, while still allowing a citizen to record a report in places where the local backend network is temporarily unavailable.
 
@@ -66,7 +66,11 @@ The implementation is intentionally direct. I wanted the user to understand imme
 
 \subsection{Map Screen}
 
-The second screen shows open reports on a map. Every report is represented by a marker, and the marker size and color help indicate how important the report is. If a marker is tapped, the application shows a centered details dialog with the issue type, confidence, status, upvote count, coordinates, and the date and time when the last photo report was taken. This keeps the selected pothole information visible without the bottom navigation area covering the metadata.
+The second screen shows reports on a map. It combines two sources of information: synchronized open reports returned by the backend and queued offline reports stored locally on the phone. Server reports are shown with orange markers whose size increases with the upvote count, while local queued reports are shown with blue upload markers. A tray at the bottom summarizes how many reports are synchronized and how many exist only on the phone.
+
+If a server marker is tapped, the application shows a details sheet with the issue type, confidence, status, upvote count, coordinates, and the date and time when the last photo report was taken. If a queued marker is tapped, the sheet instead shows the saved photo, coordinates, capture time, queue time, retry count, and last sync message. This removes the earlier empty-map experience where the user had to leave the map screen to understand what had been saved offline.
+
+The map layer uses OpenStreetMap tiles through \texttt{flutter\_map}. The current implementation wraps the tile loading in an \texttt{OfflineMapTileProvider}. Tiles that load successfully are stored in the application cache, so previously viewed areas can still be displayed without network access. Missing offline tiles are transparent, and a single generated fallback basemap is drawn underneath the tile layer. This avoids a visually broken map when the phone is offline while still allowing real cached map tiles to appear whenever they exist.
 
 This screen covers the visualization functionality because it demonstrates that submitted reports are not just stored, but also visualized in a meaningful way.
 
@@ -74,13 +78,17 @@ This screen covers the visualization functionality because it demonstrates that 
 
 In normal use, the citizen opens the application on the report tab, captures a photo, and allows the app to read the current location. The app immediately copies the photo into its own storage and writes a local queue entry containing the image path, latitude, longitude, capture time, retry state, and client report UUID. This local write happens before the network request, so the report is not lost if the backend is unavailable.
 
-After the local save, the synchronization service checks the backend health endpoint. If the backend can be reached on the configured local network address, the app uploads the queued report as a multipart request. If the backend cannot be reached, the report remains in the offline queue and the interface informs the user that it was saved offline. The same queue is retried when connectivity changes and when the app returns to the foreground. On the backend, the client report UUID makes the retry idempotent: a repeated upload for the same local report returns the already-associated backend report instead of increasing the upvote counter twice.
+After the local save, the synchronization service checks the backend health endpoint. If the backend can be reached on the configured local network address, the app uploads the queued report as a multipart request. If the backend cannot be reached, the report remains in the offline queue, appears on the map as a local saved report, and the interface informs the user that it will synchronize automatically. The same queue is retried when connectivity changes, when the app returns to the foreground, and every 30 seconds while pending reports exist. On the backend, the client report UUID makes the retry idempotent: a repeated upload for the same local report returns the already-associated backend report instead of increasing the upvote counter twice.
+
+When a previously offline report is finally processed by the backend, the app stores a short verification event. The shell consumes this event and displays an alert dialog containing the original captured photo. If the backend accepts the image, the dialog says that a pothole was confirmed and whether it was added or merged. If the backend rejects the image, the dialog explains that no pothole was detected and that no report was added to the map or dashboard.
 
 \subsection{Internal Flutter Structure}
 
 Inside the mobile project, the code is split into configuration, models, services, screens, and widgets. This was an intentional choice. Even though the project is not extremely large, placing all logic in one screen file would have made the code difficult to maintain. The configuration layer keeps application constants such as the backend URL, while the models contain data objects such as reports and statuses. The services handle API communication and location access, the screens define the main pages of the app, and the widgets contain reusable interface pieces.
 
-The offline support is implemented in the service layer. The \texttt{Offline\allowbreak Report\allowbreak Repository} stores pending reports in a local SQLite database and copies the image into the application documents directory so it is not lost when the camera cache is cleaned. The \texttt{Report\allowbreak Sync\allowbreak Service} listens for connectivity changes, checks the backend health endpoint, and uploads pending reports in chronological order. The same service is also triggered when the application returns to the foreground. This means that when the phone reconnects to the same network as the backend and the configured API address becomes reachable, queued reports are sent without requiring the user to repeat the capture flow.
+The offline support is implemented in the service layer. The \texttt{Offline\allowbreak Report\allowbreak Repository} stores pending reports in a local SQLite database and copies the image into the application documents directory so it is not lost when the camera cache is cleaned. It also exposes the queued reports to the map screen. The \texttt{Report\allowbreak Sync\allowbreak Service} listens for connectivity changes, checks the backend health endpoint, retries pending reports periodically, and uploads pending reports in chronological order. The same service is also triggered when the application returns to the foreground. This means that when the phone reconnects to the same network as the backend and the configured API address becomes reachable, queued reports are sent without requiring the user to repeat the capture flow.
+
+The map tile cache is implemented separately from the report queue. The \texttt{Offline\allowbreak Map\allowbreak Tile\allowbreak Provider} stores successfully downloaded OpenStreetMap tiles in the application cache directory. During offline use, it returns cached tile bytes when they exist and transparent tiles when they do not. A custom painter behind the tile layer draws a coherent fallback basemap so that local report markers still have geographic context instead of appearing on a blank surface.
 
 \section{Design of the Backend}
 
@@ -220,7 +228,7 @@ This rule is easy to explain, easy to implement, and easy to test. It is also in
 
 \section{Administrator Dashboard}
 
-The administrator dashboard was implemented as a lightweight web page served by the backend. It uses Leaflet and OpenStreetMap tiles and provides a report list, a map with report markers, report details such as confidence and upvotes, the date and time when the last photo report was taken, a filter by report status, and a button for marking reports as resolved.
+The administrator dashboard was implemented as a lightweight web page served by the backend. It uses Leaflet and OpenStreetMap tiles and provides a report list, a map with report markers, report details such as confidence and upvotes, the date and time when the last photo report was taken, a filter by report status, and a button for marking reports as resolved. The page also refreshes periodically and when it becomes visible again, so reports synchronized from the phone appear on the dashboard without requiring a manual refresh.
 
 The dashboard is shown in Figure~\ref{fig:admin_dashboard}. I kept the design simple on purpose. For this prototype, the important point was to show that the backend data can be consumed by an administrative interface and that the report lifecycle can be closed when an issue is solved.
 
@@ -235,13 +243,13 @@ The dashboard is shown in Figure~\ref{fig:admin_dashboard}. I kept the design si
 
 The full pothole reporting flow is the central feature of the application because it connects the mobile interface, offline queue, backend API, detector, and database.
 
-In this flow, the app requests location access, opens the camera, captures and previews the image, and saves the image, coordinates, capture time, and client report identifier locally. It then sends the saved report when the backend is reachable, receives the response from the backend or keeps the report queued, and displays either success, merge, offline queue, or error feedback.
+In this flow, the app requests location access, opens the camera, captures and previews the image, and saves the image, coordinates, capture time, and client report identifier locally. It then sends the saved report when the backend is reachable, receives the response from the backend or keeps the report queued, and displays either success, merge, offline queue, or error feedback. If the report was captured offline, the map screen shows it immediately as a local report. After synchronization, the app shows a verification dialog with the captured image and the backend decision.
 
 This flow was implemented and tested end to end. The result is visible not only on the report screen, but also later in the map and dashboard. The offline queue keeps the citizen action short even when the phone is not currently connected to the backend network.
 
 \section{Report Visualization and Management}
 
-Report visualization and management forms the second main application flow. In the mobile app this means showing open reports on the map. In the administrative side this means being able to inspect the report list and change the status of an issue to resolved.
+Report visualization and management forms the second main application flow. In the mobile app this means showing synchronized open reports and local queued reports on the map. In the administrative side this means being able to inspect the report list and change the status of an issue to resolved. The map behavior is deliberately connected to the offline queue so the citizen can see that a saved capture has a location and is waiting for backend verification.
 
 This functionality is important because it shows that the application is more than just an upload form. It also has a full read-and-manage cycle.
 
@@ -362,11 +370,13 @@ Backend health check & Backend exposes runtime information & Implemented and rea
 Valid report submission & New or merged report is returned & Implemented through the report endpoint. \\
 Duplicate report nearby & Existing report gains one upvote & Implemented through PostGIS distance check. \\
 Offline report capture & Report is saved locally with image, coordinates, capture time, and client UUID & Implemented in the Flutter offline repository. \\
-Offline synchronization & Queued reports are sent after backend reachability is restored & Implemented through connectivity and app-resume sync triggers. \\
+Offline synchronization & Queued reports are sent after backend reachability is restored & Implemented through connectivity, app-resume sync triggers, and a periodic retry while pending reports exist. \\
+Offline map display & Local queued reports remain visible without backend access & Implemented by combining the local SQLite queue with cached map tiles and a generated fallback basemap. \\
+Offline verification alert & User is told whether a queued photo was accepted or rejected after sync & Implemented with a verification event and an alert dialog that includes the captured image. \\
 Repeated client report ID & Backend does not count the same client submission twice & Implemented through the client submission receipt table. \\
 Open reports request & Backend returns report list & Implemented for both mobile app and dashboard. \\
 Status update & Report changes to resolved & Implemented through the PATCH endpoint. \\
-Dashboard visualization & Reports appear on a map with details & Implemented through the admin page. \\
+Dashboard visualization & Reports appear on a map with details & Implemented through the admin page with periodic auto-refresh. \\
 Detector smoke test & Image is processed by the detection service & Passed through demo mode and detector wrapper tests. \\
 YOLO checkpoint integration & Backend loads \texttt{pothole\_yolov8n.pt} from the model directory & Verified with a real test image through the backend detector wrapper. \\
 Confidence calibration & Runtime threshold limits low-confidence reports & Configured as \texttt{MIN\_DETECTION\_CONFIDENCE=0.65}. \\
@@ -380,6 +390,6 @@ Confidence calibration & Runtime threshold limits low-confidence reports & Confi
 
 From the practical implementation, several conclusions became clear.
 
-First, the project works best when the scope is kept narrow. Supporting only potholes made the detector contract, the database schema, and the user interface much easier to manage. Second, the geospatial merge logic adds real value because it avoids clutter and gives the administrator a better priority signal. Third, even a simple dashboard is enough to make the stored reports operationally useful.
+First, the project works best when the scope is kept narrow. Supporting only potholes made the detector contract, the database schema, and the user interface much easier to manage. Second, the geospatial merge logic adds real value because it avoids clutter and gives the administrator a better priority signal. Third, the offline user experience is better when local data is treated as part of the visible application state, not only as a hidden retry buffer. Showing queued reports on the map and later explaining the backend decision makes the application feel more predictable. Fourth, even a simple dashboard is enough to make the stored reports operationally useful.
 
 There are also limitations. The current prototype does not include authentication, push notifications, municipality-specific work orders, or a multi-class damage taxonomy. The trained detector is also limited to the visual domain of the available pothole dataset. However, the project now includes a real YOLOv8 checkpoint, a documented training run, quantitative validation and test metrics, and a calibrated threshold connected to the backend runtime configuration. This makes the application more than a UI prototype: it demonstrates the complete loop from image capture to model inference, database insertion or merging, map visualization, and administrative resolution.

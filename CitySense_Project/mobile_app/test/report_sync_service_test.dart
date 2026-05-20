@@ -2,7 +2,9 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile_app/models/issue_report.dart';
 import 'package:mobile_app/models/offline_report.dart';
+import 'package:mobile_app/models/report_status.dart';
 import 'package:mobile_app/models/report_submission_result.dart';
 import 'package:mobile_app/services/citysense_api_client.dart';
 import 'package:mobile_app/services/offline_report_repository.dart';
@@ -67,6 +69,58 @@ void main() {
     expect(repository.deletedReportIds, isEmpty);
     expect(repository.retryableFailures, ['client-1']);
   });
+
+  test('records a pothole confirmation when an offline report syncs', () async {
+    final repository = _FakeOfflineReportRepository();
+    final service = ReportSyncService(
+      apiClient: _AcceptingApiClient(),
+      repository: repository,
+    );
+    await repository.enqueueReport(
+      imageFile: imageFile,
+      latitude: 46.77,
+      longitude: 23.59,
+      capturedAt: DateTime.utc(2026, 5, 20, 12),
+    );
+
+    await service.syncPendingReports();
+
+    final verifications = service.takeOfflineVerifications();
+    expect(verifications, hasLength(1));
+    expect(verifications.single.accepted, isTrue);
+    expect(verifications.single.title, 'Pothole confirmed');
+    expect(verifications.single.message, contains('detected a pothole'));
+    expect(verifications.single.imageBytes, [1, 2, 3]);
+    expect(repository.pendingCountValue, 0);
+    expect(service.takeOfflineVerifications(), isEmpty);
+  });
+
+  test(
+    'records a no-pothole message when an offline report is rejected',
+    () async {
+      final repository = _FakeOfflineReportRepository();
+      final service = ReportSyncService(
+        apiClient: _RejectingApiClient(isRetryable: false),
+        repository: repository,
+      );
+      await repository.enqueueReport(
+        imageFile: imageFile,
+        latitude: 46.77,
+        longitude: 23.59,
+        capturedAt: DateTime.utc(2026, 5, 20, 12),
+      );
+
+      await service.syncPendingReports();
+
+      final verifications = service.takeOfflineVerifications();
+      expect(verifications, hasLength(1));
+      expect(verifications.single.accepted, isFalse);
+      expect(verifications.single.title, 'No pothole detected');
+      expect(verifications.single.message, contains('No report was added'));
+      expect(verifications.single.imageBytes, [1, 2, 3]);
+      expect(repository.pendingCountValue, 0);
+    },
+  );
 }
 
 class _RejectingApiClient extends CitySenseApiClient {
@@ -93,6 +147,46 @@ class _RejectingApiClient extends CitySenseApiClient {
       'No pothole was detected in the uploaded image.',
       statusCode: isRetryable ? 503 : 422,
       isRetryable: isRetryable,
+    );
+  }
+}
+
+class _AcceptingApiClient extends CitySenseApiClient {
+  _AcceptingApiClient() : super(dio: Dio());
+
+  @override
+  Future<bool> isBackendReachable({
+    Duration timeout = const Duration(seconds: 3),
+  }) async {
+    return true;
+  }
+
+  @override
+  Future<ReportSubmissionResult> submitReport({
+    required File imageFile,
+    required double latitude,
+    required double longitude,
+    DateTime? capturedAt,
+    String? clientReportId,
+  }) async {
+    final now = DateTime.utc(2026, 5, 20, 12);
+    return ReportSubmissionResult(
+      message: 'Created a new pothole report.',
+      deduped: false,
+      clientReportId: clientReportId,
+      report: IssueReport(
+        id: 'server-1',
+        issueType: 'pothole',
+        confidence: 0.91,
+        latitude: latitude,
+        longitude: longitude,
+        status: ReportStatus.open,
+        upvotes: 1,
+        capturedAt: capturedAt ?? now,
+        lastPhotoReportedAt: capturedAt ?? now,
+        createdAt: now,
+        updatedAt: now,
+      ),
     );
   }
 }

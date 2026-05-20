@@ -16,7 +16,7 @@ The most important design decision that follows from this stakeholder analysis i
 
 \section{Main Usage Scenario}
 
-The basic usage scenario of CitySense is straightforward. A citizen sees a pothole and opens the mobile app. The app requests camera and location permissions if necessary, and the user takes a photo and confirms the submission. The app stores the photo, coordinates, capture time, and a client-side report identifier locally. If the backend is reachable, it receives the image and metadata immediately; otherwise, the report remains queued on the phone. The detector classifies the issue as a pothole or rejects the image, after which the database checks whether a nearby pothole was already reported. The system then either creates a new report or increments the upvote counter of an existing one, and the report becomes visible on the map and in the dashboard.
+The basic usage scenario of CitySense is straightforward. A citizen sees a pothole and opens the mobile app. The app requests camera and location permissions if necessary, and the user takes a photo and confirms the submission. The app stores the photo, coordinates, capture time, and a client-side report identifier locally. If the backend is reachable, it receives the image and metadata immediately; otherwise, the report remains queued on the phone and is shown as a local marker on the map screen. The detector classifies the issue as a pothole or rejects the image after synchronization, after which the mobile app can show whether the offline photo was accepted or rejected. If the image is accepted, the database checks whether a nearby pothole was already reported. The system then either creates a new report or increments the upvote counter of an existing one, and the report becomes visible on the map and in the dashboard.
 
 This scenario guided the design of the rest of the requirements.
 
@@ -40,10 +40,13 @@ FR4 & The backend must run a pothole-oriented detection step and reject unsuppor
 FR5 & The backend must store reports in a database together with their location, status, confidence, and metadata. \\
 FR6 & The backend must detect whether a report is a duplicate of an already open pothole within a radius of 10 meters. \\
 FR7 & If a duplicate exists, the backend must merge the report by incrementing the upvote count instead of inserting a new row. \\
-FR8 & The mobile application must provide a map view for open reports and show a centered detail dialog when a marker is selected. \\
+FR8 & The mobile application must provide a map view for synchronized open reports and locally queued reports, and show a detail sheet when a marker is selected. \\
 FR9 & The administrative dashboard must show stored reports on a map together with metadata such as status, upvotes, and the date and time of the last photo report. \\
 FR10 & The administrative dashboard must allow the administrator to mark a report as resolved. \\
 FR11 & The mobile application must save reports locally when the backend is unreachable and synchronize them automatically when the backend becomes reachable again. \\
+FR12 & The mobile application must inform the user when an offline photo is later accepted as a pothole or rejected by the backend detector. \\
+FR13 & The mobile map should remain usable offline by reusing cached map tiles and showing a coherent fallback background when real tiles are unavailable. \\
+FR14 & The administrative dashboard should refresh periodically so newly synchronized mobile reports appear without a manual reload. \\
 \bottomrule
 \caption{Functional requirements of the CitySense system.}
 \label{tab:functional_requirements}
@@ -66,6 +69,7 @@ NFR4 & The map view should remain understandable even when multiple users report
 NFR5 & The implementation should be easy to run locally for demonstration and testing. \\
 NFR6 & The project should remain maintainable and easy to explain to future developers or administrators. \\
 NFR7 & Retrying an offline report should be idempotent, so the same client submission must not increase the duplicate counter more than once. \\
+NFR8 & Temporary backend or network loss should degrade the mobile experience gracefully instead of leaving blank or misleading map screens. \\
 \bottomrule
 \end{tabular}
 \caption{Non-functional requirements considered during implementation.}
@@ -86,11 +90,11 @@ The actor is the citizen user. The preconditions are that the mobile app is inst
 
 In the main flow, the user taps the report button and the app requests location if needed. The user captures a pothole photo, then the app saves the image, coordinates, capture time, and client report identifier locally. If the backend is reachable, the app uploads the saved report and the backend processes the request. The user then receives a success or error message.
 
-The postcondition is that a new report is created or merged with an existing one. In the alternative flow, if the backend cannot be reached, the local report remains in the offline queue. The application retries synchronization when connectivity changes or when the app is resumed. Once the backend is reachable on the configured network address, the queued report is sent using the same client report identifier.
+The postcondition is that a new report is created or merged with an existing one. In the alternative flow, if the backend cannot be reached, the local report remains in the offline queue and is displayed on the map as a local saved report. The application retries synchronization when connectivity changes, when the app is resumed, and through a periodic retry while pending reports exist. Once the backend is reachable on the configured network address, the queued report is sent using the same client report identifier. After the backend processes the photo, the app shows an alert with the captured image that states whether the photo was accepted as a pothole or rejected.
 
 \subsection{Use Case 2: View Active Reports}
 
-The actor is the citizen user or administrator. In the main flow, the user opens the map screen and the app requests the list of open reports from the backend. The reports are rendered as map markers. When the user taps a marker, the application shows details such as confidence, status, upvotes, coordinates, and the date and time when the last photo report was taken. The postcondition is that the user understands where active pothole reports are located.
+The actor is the citizen user or administrator. In the main flow, the user opens the map screen and the app requests the list of open reports from the backend. The reports are rendered as map markers. If the backend cannot be reached, the app still reads the local offline queue and shows queued reports on the same map screen. Previously loaded OpenStreetMap tiles are reused from the local cache, and a generated fallback basemap is drawn underneath missing tiles. When the user taps a marker, the application shows details such as confidence, status, upvotes, coordinates, and the date and time when the last photo report was taken. For queued local reports, the detail sheet shows the saved photo, coordinates, capture time, retry count, and last sync message. The postcondition is that the user understands where active and locally saved pothole reports are located.
 
 \subsection{Use Case 3: Resolve a Report}
 
@@ -125,7 +129,7 @@ At the center of the system there is one main entity: the report. The fields of 
 \label{tab:report_entity}
 \end{table}
 
-Offline synchronization also introduces a small receipt table, \texttt{report\_\allowbreak client\_\allowbreak submissions}. It stores the client-generated report UUID, the backend report to which it was applied, and whether that submission was merged as a duplicate. This table prevents an offline retry from incrementing the same pothole twice if the first upload succeeded but the phone did not receive the response.
+Offline synchronization also introduces two additional data stores. On the phone, the SQLite table \texttt{offline\_\allowbreak reports} stores the client report UUID, copied image path, latitude, longitude, capture time, queue time, retry count, last error, and queue state. This local table is what allows the map screen to show saved reports before the backend accepts them. On the server, the receipt table \texttt{report\_\allowbreak client\_\allowbreak submissions} stores the client-generated report UUID, the backend report to which it was applied, and whether that submission was merged as a duplicate. This server table prevents an offline retry from incrementing the same pothole twice if the first upload succeeded but the phone did not receive the response.
 
 \section{API Specification}
 

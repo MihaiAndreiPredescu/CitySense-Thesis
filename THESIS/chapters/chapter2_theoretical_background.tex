@@ -41,20 +41,13 @@ Citizen reporting applications usually fail when they ask too much from the user
 
 The second theoretical topic is backend communication. The mobile app does not store the reports locally as the main source of truth. Instead, it sends them to a backend service. This is a common client-server architecture, where the mobile app is responsible for collecting input, and the backend is responsible for validation, persistence, and business logic.
 
-FastAPI \cite{fastapi_docs} was chosen as the backend framework because it is lightweight, expressive, and well suited for JSON-based APIs. It supports request validation through schemas, integrates cleanly with Python code, and is easy to document. For CitySense, this matters because the endpoints are few but important:
-
-\begin{itemize}
-  \item an endpoint for the health status of the backend;
-  \item an endpoint for sending a report with image and coordinates;
-  \item an endpoint for listing reports;
-  \item an endpoint for changing the status of a report.
-\end{itemize}
+FastAPI \cite{fastapi_docs} was chosen as the backend framework because it is lightweight, expressive, and well suited for JSON-based APIs. It supports request validation through schemas, integrates cleanly with Python code, and is easy to document. For CitySense, this matters because the endpoints are few but important: one endpoint reports the health status of the backend, one endpoint sends a report with image and coordinates, one endpoint lists reports, and one endpoint changes the status of a report.
 
 The backend also has to deal with multipart uploads because the mobile app sends image files, not only JSON text. This is another reason why a clear REST framework is useful. The backend can validate types, return informative errors, and expose a consistent response structure to both the mobile client and the admin dashboard.
 
 \subsection{Separation of Concerns}
 
-In a project of this size, separation of concerns is important. The detection logic should not be mixed directly with the database model, and the API routes should not contain all of the business logic in one place. The current implementation follows this principle by separating configuration, persistence, detection, storage, and reporting services. This makes the code easier to test and also makes the thesis easier to explain.
+In a project of this size, separation of concerns is important. The detection logic should not be mixed directly with the database model, and the API routes should not contain all of the business logic in one place. The current implementation follows this principle by separating configuration, persistence, detection, storage, and reporting services. This makes the code easier to test and also makes the system easier to explain.
 
 \section{Object Detection with YOLO}
 
@@ -62,19 +55,13 @@ The computer vision component of the thesis is based on object detection. Unlike
 
 The original YOLO family became popular because it treats detection as a single-stage task \cite{redmon2016yolo}. Instead of generating regions first and classifying them later, the model predicts classes and bounding boxes in one forward pass. This makes YOLO practical for real-time or near-real-time scenarios.
 
-The implementation in CitySense uses Ultralytics YOLO \cite{jocher2023ultralytics}. In simplified terms, the detector returns three important things:
-
-\begin{enumerate}[label=\arabic*.]
-  \item a class label;
-  \item a confidence score;
-  \item the coordinates of a predicted bounding box.
-\end{enumerate}
+The implementation in CitySense uses Ultralytics YOLO \cite{jocher2023ultralytics}. In simplified terms, the detector returns three important things: a class label, a confidence score, and the coordinates of a predicted bounding box.
 
 For the application, the label space is intentionally restricted. The backend accepts only pothole-like labels as valid output. This is important because the project is not intended to be a general visual recognition system. It is a specialized reporting application. Restricting the label space makes the system easier to reason about and reduces the risk of meaningless outputs being shown to the user.
 
-\subsection{Why a Lightweight Model Matters}
+\subsection{Importance of a Lightweight Model}
 
-Model complexity is always a trade-off. A larger model may achieve better accuracy, but it also requires more resources and usually takes more time to run. For a student project that needs to be demonstrable on limited hardware, a smaller YOLO variant is a practical compromise. It allows the backend to remain responsive while still supporting the thesis goal of automatic issue labeling.
+Model complexity is always a trade-off. A larger model may achieve better accuracy, but it also requires more resources and usually takes more time to run. For a prototype that needs to remain demonstrable on limited hardware, a smaller YOLO variant is a practical compromise. It allows the backend to remain responsive while still supporting the system goal of automatic issue labeling.
 
 \subsection{Confidence Thresholds}
 
@@ -84,13 +71,7 @@ Another practical concept is the confidence threshold. A detector usually return
 
 PostgreSQL is widely used for structured relational data \cite{postgres_docs}. For CitySense, however, standard relational columns are not enough because location is central to the business logic. The project therefore uses PostGIS \cite{obe2021postgis}, which extends PostgreSQL with spatial types and spatial functions.
 
-The key idea is that a location should not be treated only as two unrelated numbers. If latitude and longitude are stored as a true geographic point, then the database can answer questions such as:
-
-\begin{itemize}
-  \item Is there an open issue near this position?
-  \item How far apart are two reports?
-  \item Which reports fall inside a selected area?
-\end{itemize}
+The key idea is that a location should not be treated only as two unrelated numbers. If latitude and longitude are stored as a true geographic point, then the database can answer practical spatial queries, such as whether an open issue exists near a given position, how far apart two reports are, and which reports fall inside a selected area.
 
 This is what makes duplicate merging possible. The backend creates a point from the incoming GPS coordinates and compares it to the points of already stored reports.
 

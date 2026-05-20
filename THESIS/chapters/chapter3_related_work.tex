@@ -1,18 +1,12 @@
 \chapter{Related Work and Technology Choices}
 
-The second theoretical chapter has two goals. First, it places the project in the context of existing work. Second, it explains why the final technology stack was chosen. This is useful because a bachelor project is not only about building something that works, but also about showing that the chosen approach is reasonable when compared to alternatives.
+The second theoretical chapter has two goals. First, it places the project in the context of existing work. Second, it explains why the final technology stack was chosen. This is useful because a software project is not only about building something that works, but also about showing that the chosen approach is reasonable when compared to alternatives.
 
 Table~\ref{tab:related_work_comparison} summarizes the main directions identified in the literature, while Figure~\ref{fig:citysense_positioning} shows how CitySense combines ideas from more than one category instead of belonging to only one of them.
 
 \section{Existing Civic Reporting Solutions}
 
-Digital reporting of public issues has been studied for several years. A common idea is to let citizens act as sensors by using their phones to send information about traffic, road defects, or other urban problems. The Federal Highway Administration mentions examples such as Street Bump and other collective-information systems that use mobile devices to gather road-related data \cite{fhwa2022collective}. These projects show that citizens can contribute valuable data, but they also show several recurring problems:
-
-\begin{itemize}
-  \item users do not always want to complete long reporting forms;
-  \item repeated reports may refer to the same physical issue;
-  \item municipalities need a simple way to interpret incoming data.
-\end{itemize}
+Digital reporting of public issues has been studied for several years. A common idea is to let citizens act as sensors by using their phones to send information about traffic, road defects, or other urban problems. The Federal Highway Administration mentions examples such as Street Bump and other collective-information systems that use mobile devices to gather road-related data \cite{fhwa2022collective}. These projects show that citizens can contribute valuable data, but they also show several recurring problems: users do not always want to complete long reporting forms, repeated reports may refer to the same physical issue, and municipalities need a simple way to interpret incoming data.
 
 These observations are directly relevant to CitySense. My project does not try to replace municipal workflows completely. Instead, it focuses on one narrow improvement: make the reporting process short and use automation to reduce unnecessary manual work.
 
@@ -20,13 +14,7 @@ These observations are directly relevant to CitySense. My project does not try t
 
 Cheng's pothole management work is especially relevant because it discusses potholes as a complete management problem, not just as a single technical challenge \cite{cheng2024potholeprogram}. In practice, pothole handling involves several steps: identifying the defect, storing the report, deciding whether it is new or already known, assigning priority, and eventually marking it as solved.
 
-This systems view is also the direction followed in CitySense. The project is not limited to running a detector on an image. It also tries to answer practical questions such as:
-
-\begin{itemize}
-  \item How should a citizen create a report with minimal effort?
-  \item How should repeated reports be handled?
-  \item What information should the administrator see first?
-\end{itemize}
+This systems view is also the direction followed in CitySense. The project is not limited to running a detector on an image. It also addresses practical concerns such as how a citizen can create a report with minimal effort, how repeated reports should be handled, and what information the administrator should see first.
 
 Compared to generic pothole management systems, the distinctive element of CitySense is the combination of image-based issue labeling and geospatial duplicate merging inside one simple application flow.
 
@@ -34,29 +22,29 @@ Compared to generic pothole management systems, the distinctive element of CityS
 
 The machine learning side of the project is influenced by road-damage detection research. Arya et al.\ provide a good overview of the current state of the field and discuss both the strengths and the limitations of existing approaches \cite{arya2022rdd2022}. One important point from this literature is that road-damage detection is difficult because the data is visually diverse. Lighting conditions, camera angle, road texture, and weather can all affect the result.
 
-Another important contribution of this research direction is the availability of public datasets. RDD2022 is especially relevant because it collects road-damage images from multiple countries and therefore offers more diversity than a small local dataset \cite{arya2022rdd2022}. For a student project, this matters a lot because building a custom dataset from scratch would require far more time than is realistically available in one semester.
+Another important contribution of this research direction is the availability of public datasets. RDD2022 is especially relevant because it collects road-damage images from multiple countries and therefore offers more diversity than a small local dataset \cite{arya2022rdd2022}. This matters because building a custom dataset from scratch would require extensive field collection, annotation, and validation before model training could even begin.
 
-\subsection{Why the Thesis Does Not Claim a New Detection Model}
+\subsection{Scope of the Detection Contribution}
 
 It is important to state clearly that this thesis is not a pure machine learning paper. I do not propose a new architecture or a new loss function. Instead, I fine-tune an existing YOLO-based implementation and use it as a practical detector component inside a bigger software system. This keeps the scope realistic and matches the main goal of the thesis, which is to build a functional reporting platform.
 
 \section{Technology Choice Rationale}
 
-After looking at existing work, the next question is why the final stack was chosen. The answer is mostly practical: each technology solves one concrete problem in the project.
+After looking at existing work, the next step is to explain why the final stack was chosen. The reason is mostly practical: each technology solves one concrete problem in the project.
 
-\subsection{Why Flutter}
+\subsection{Choice of Flutter}
 
-Flutter was chosen because it made it possible to build the application UI quickly, use the camera and GPS packages from one codebase, and keep the project structured around screens and reusable widgets. Since the target was a demonstrable bachelor project and not a full production rollout, development speed was an important factor.
+Flutter was chosen because it made it possible to build the application UI quickly, use the camera and GPS packages from one codebase, and keep the project structured around screens and reusable widgets. Since the target was a demonstrable prototype and not a full production rollout, development speed was an important factor.
 
-\subsection{Why FastAPI}
+\subsection{Choice of FastAPI}
 
-FastAPI was chosen because the backend only needed a focused API, not a heavy enterprise framework. It is well suited for handling file uploads, JSON responses, and small but clear schemas. For a student project, this keeps the code easier to understand and easier to present during the defense.
+FastAPI was chosen because the backend only needed a focused API, not a heavy enterprise framework. It is well suited for handling file uploads, JSON responses, and small but clear schemas. This keeps the code easier to understand, maintain, and extend.
 
-\subsection{Why PostgreSQL and PostGIS}
+\subsection{Choice of PostgreSQL and PostGIS}
 
 A simple relational database would not be enough because distance-based queries are central to the project. PostgreSQL with PostGIS offers both traditional relational storage and spatial operations in the same system. This made it a natural fit for report storage and duplicate detection.
 
-\subsection{Why YOLO}
+\subsection{Choice of YOLO}
 
 YOLO was chosen because it offers a good balance between speed and practicality. For a backend service that may eventually process multiple images, a very heavy detection pipeline would make the user experience worse. A lightweight YOLO model is more realistic for this kind of application.
 
@@ -64,10 +52,10 @@ YOLO was chosen because it offers a good balance between speed and practicality.
 \centering
 \begin{tabular}{>{\raggedright\arraybackslash}p{0.26\linewidth} >{\raggedright\arraybackslash}p{0.28\linewidth} >{\raggedright\arraybackslash}p{0.30\linewidth}}
 \toprule
-\textbf{Direction} & \textbf{Main Strength} & \textbf{Main Limitation for This Thesis} \\
+\textbf{Direction} & \textbf{Main Strength} & \textbf{Main Limitation for CitySense} \\
 \midrule
 Generic civic reporting platforms & Encourage citizen participation and support issue intake. & They often rely on manual categorization and produce repeated reports for the same issue. \\
-Pothole management systems & Treat potholes as part of a broader maintenance workflow. & They may assume a larger municipal process than what a one-semester prototype can implement. \\
+Pothole management systems & Treat potholes as part of a broader maintenance workflow. & They may assume a larger municipal process than what a focused prototype can implement. \\
 Road-damage detection research & Offers datasets and models for automatic visual analysis. & It does not automatically solve report storage, map visualization, or duplicate merging. \\
 CitySense approach & Connects reporting, detection, and geographic deduplication in one flow. & It remains a focused prototype and does not cover the full municipal lifecycle. \\
 \bottomrule
@@ -80,14 +68,7 @@ CitySense approach & Connects reporting, detection, and geographic deduplication
 
 After comparing the existing work and the stack choices, CitySense can be positioned as a software integration project with a focused civic use case. It is not only a reporting form, and it is not only a computer vision demo. It sits between those two areas.
 
-The project contributes by connecting:
-
-\begin{enumerate}[label=\arabic*.]
-  \item a simple citizen-facing report flow;
-  \item automatic pothole labeling from an image;
-  \item geospatial duplicate detection;
-  \item a dashboard view for operational use.
-\end{enumerate}
+The project contributes by connecting a simple citizen-facing report flow, automatic pothole labeling from an image, geospatial duplicate detection, and a dashboard view for operational use.
 
 \begin{figure}[htbp]
 \centering

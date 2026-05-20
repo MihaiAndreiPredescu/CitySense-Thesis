@@ -4,28 +4,9 @@ This chapter continues the practical part of the thesis. After defining the requ
 
 \section{General Architecture}
 
-CitySense is organized as a client-server application with a small administrative web layer. The main components are:
+CitySense is organized as a client-server application with a small administrative web layer. The user-facing side is represented by the Flutter mobile application and the local offline report queue on the phone. The server side contains the FastAPI backend, the PostgreSQL/PostGIS database, the YOLO-based detection service integrated in the backend, and the administrator dashboard rendered in the browser.
 
-\begin{enumerate}[label=\arabic*.]
-  \item the Flutter mobile application;
-  \item the local offline report queue on the phone;
-  \item the FastAPI backend;
-  \item the PostgreSQL/PostGIS database;
-  \item the YOLO-based detection service integrated in the backend;
-  \item the administrator dashboard rendered in the browser.
-\end{enumerate}
-
-The flow between these components is the following:
-
-\begin{enumerate}[label=\arabic*.]
-  \item The mobile app captures the image and the user location.
-  \item The app stores the report locally together with the capture time and a client-generated UUID.
-  \item The app sends the report to the backend through the REST API when the configured backend address is reachable.
-  \item The backend stores the uploaded image and runs the detector.
-  \item The backend checks for a nearby duplicate through PostGIS.
-  \item The backend stores or merges the report in the database.
-  \item The app and the dashboard request the list of reports and render them on a map.
-\end{enumerate}
+The flow between these components starts when the mobile app captures the image and the user location. The app stores the report locally together with the capture time and a client-generated UUID, then sends the report to the backend through the REST API when the configured backend address is reachable. The backend stores the uploaded image, runs the detector, checks for a nearby duplicate through PostGIS, and either stores or merges the report in the database. The app and the dashboard then request the list of reports and render them on a map.
 
 This architecture was chosen because it keeps heavy logic out of the phone and makes the backend the single source of truth, while still allowing a citizen to record a report in places where the local backend network is temporarily unavailable.
 
@@ -64,7 +45,7 @@ docker compose logs backend
 docker compose down
 \end{verbatim}
 
-This deployment model is suitable for the thesis because it makes the backend reproducible. A reviewer or developer does not need to manually reconstruct the backend environment; the required services and their relationships are documented in the Compose file.
+This deployment model is suitable for the project because it makes the backend reproducible. A reviewer or developer does not need to manually reconstruct the backend environment; the required services and their relationships are documented in the Compose file.
 
 \section{Design of the Mobile Application}
 
@@ -72,14 +53,7 @@ The mobile application was designed around two screens, because this was enough 
 
 \subsection{Report Screen}
 
-The report screen is the most important part of the citizen workflow. It contains:
-
-\begin{itemize}
-  \item a photo preview area;
-  \item a short status card with user feedback;
-  \item an offline queue status card when reports are waiting to be synchronized;
-  \item a button that triggers the camera flow and submission.
-\end{itemize}
+The report screen is the most important part of the citizen workflow. It contains a photo preview area, a short status card with user feedback, an offline queue status card when reports are waiting to be synchronized, and a button that triggers the camera flow and submission.
 
 The implementation is intentionally direct. I wanted the user to understand immediately what the app is for. There are no advanced menus, no long forms, and no extra fields that could slow down the interaction. Internally, however, the report is first saved on the phone and then submitted from that saved copy. This makes the online and offline paths use the same data structure. A screenshot of this interface is shown again in Figure~\ref{fig:app_interface}.
 
@@ -94,7 +68,7 @@ The implementation is intentionally direct. I wanted the user to understand imme
 
 The second screen shows open reports on a map. Every report is represented by a marker, and the marker size and color help indicate how important the report is. If a marker is tapped, the application shows a centered details dialog with the issue type, confidence, status, upvote count, coordinates, and the date and time when the last photo report was taken. This keeps the selected pothole information visible without the bottom navigation area covering the metadata.
 
-This screen covers functionality F2 from the semester work because it demonstrates that submitted reports are not just stored, but also visualized in a meaningful way.
+This screen covers the visualization functionality because it demonstrates that submitted reports are not just stored, but also visualized in a meaningful way.
 
 \subsection{How the Application Works in Practice}
 
@@ -104,15 +78,7 @@ After the local save, the synchronization service checks the backend health endp
 
 \subsection{Internal Flutter Structure}
 
-Inside the mobile project, the code is split into configuration, models, services, screens, and widgets. This was an intentional choice. Even though the project is not extremely large, placing all logic in one screen file would have made the code difficult to maintain. The separation currently looks like this:
-
-\begin{itemize}
-  \item \textbf{config} for application constants such as the backend URL;
-  \item \textbf{models} for data objects such as reports and statuses;
-  \item \textbf{services} for API communication and location access;
-  \item \textbf{screens} for the main pages of the app;
-  \item \textbf{widgets} for reusable interface pieces.
-\end{itemize}
+Inside the mobile project, the code is split into configuration, models, services, screens, and widgets. This was an intentional choice. Even though the project is not extremely large, placing all logic in one screen file would have made the code difficult to maintain. The configuration layer keeps application constants such as the backend URL, while the models contain data objects such as reports and statuses. The services handle API communication and location access, the screens define the main pages of the app, and the widgets contain reusable interface pieces.
 
 The offline support is implemented in the service layer. The \texttt{Offline\allowbreak Report\allowbreak Repository} stores pending reports in a local SQLite database and copies the image into the application documents directory so it is not lost when the camera cache is cleaned. The \texttt{Report\allowbreak Sync\allowbreak Service} listens for connectivity changes, checks the backend health endpoint, and uploads pending reports in chronological order. The same service is also triggered when the application returns to the foreground. This means that when the phone reconnects to the same network as the backend and the configured API address becomes reachable, queued reports are sent without requiring the user to repeat the capture flow.
 
@@ -122,15 +88,7 @@ The backend was implemented as a modular FastAPI application. I kept the routing
 
 \subsection{Configuration Layer}
 
-The configuration layer reads environment variables such as:
-
-\begin{itemize}
-  \item the database URL;
-  \item the detector mode;
-  \item the model path;
-  \item the duplicate radius;
-  \item the allowed CORS origins.
-\end{itemize}
+The configuration layer reads environment variables such as the database URL, detector mode, model path, duplicate radius, and allowed CORS origins.
 
 This is important because it separates code from deployment details. For example, the application can run in a local demo mode without changing the source code.
 
@@ -140,18 +98,13 @@ The persistence layer is built with SQLAlchemy and PostgreSQL. The report entity
 
 \subsection{Detection Service}
 
-The detection service wraps the YOLO model. It can work in two modes:
+The detection service wraps the YOLO model. It can work in yolo mode, where it loads a real checkpoint from disk, or in demo mode, where it returns a deterministic pothole-like result for smoke testing.
 
-\begin{itemize}
-  \item \textbf{yolo mode}, where it loads a real checkpoint from disk;
-  \item \textbf{demo mode}, where it returns a deterministic pothole-like result for smoke testing.
-\end{itemize}
-
-The demo mode was useful during development because it allowed me to verify the API flow, database insertion, and mobile feedback even when a final trained model was not available. At the same time, the code still keeps the real detector path as the intended production-like behavior.
+The demo mode was useful because it allowed me to verify the API flow, database insertion, and mobile feedback even when a final trained model was not available. At the same time, the code still keeps the real detector path as the intended production-like behavior.
 
 \subsection{YOLOv8 Dataset, Training, and Weight Integration}
 
-The real detection mode uses a YOLOv8 checkpoint trained specifically for the \texttt{pothole} class. The starting point was the lightweight \texttt{yolov8n.pt} model from Ultralytics \cite{jocher2023ultralytics}. This model is small enough to run on the available CPU hardware during development, while still being expressive enough for a single-class pothole detector.
+The real detection mode uses a YOLOv8 checkpoint trained specifically for the \texttt{pothole} class. The starting point was the lightweight \texttt{yolov8n.pt} model from Ultralytics \cite{jocher2023ultralytics}. This model is small enough to run on the available CPU hardware, while still being expressive enough for a single-class pothole detector.
 
 The dataset was exported in YOLOv8 format from Roboflow Universe \cite{roboflow_universe}. The final local dataset structure used by the project is:
 
@@ -233,7 +186,7 @@ The mobile application does not run the model directly. It only sends the image 
 
 \subsection{Detector Runtime Configuration}
 
-The deployed detector configuration is part of the backend environment. For the trained checkpoint used in this thesis, the relevant values are:
+The deployed detector configuration is part of the backend environment. For the trained checkpoint used in the implemented system, the relevant values are:
 
 \begin{verbatim}
 DETECTOR_MODE=yolo
@@ -267,18 +220,9 @@ This rule is easy to explain, easy to implement, and easy to test. It is also in
 
 \section{Administrator Dashboard}
 
-The administrator dashboard was implemented as a lightweight web page served by the backend. It uses Leaflet and OpenStreetMap tiles and provides:
+The administrator dashboard was implemented as a lightweight web page served by the backend. It uses Leaflet and OpenStreetMap tiles and provides a report list, a map with report markers, report details such as confidence and upvotes, the date and time when the last photo report was taken, a filter by report status, and a button for marking reports as resolved.
 
-\begin{itemize}
-  \item a report list;
-  \item a map with report markers;
-  \item report details such as confidence and upvotes;
-  \item the date and time when the last photo report was taken;
-  \item a filter by report status;
-  \item a button for marking reports as resolved.
-\end{itemize}
-
-The dashboard is shown in Figure~\ref{fig:admin_dashboard}. I kept the design simple on purpose. For the thesis, the important thing was to show that the backend data can be consumed by an administrative interface and that the report lifecycle can be closed when an issue is solved.
+The dashboard is shown in Figure~\ref{fig:admin_dashboard}. I kept the design simple on purpose. For this prototype, the important point was to show that the backend data can be consumed by an administrative interface and that the report lifecycle can be closed when an issue is solved.
 
 \begin{figure}[htbp]
     \centering
@@ -287,42 +231,25 @@ The dashboard is shown in Figure~\ref{fig:admin_dashboard}. I kept the design si
     \label{fig:admin_dashboard}
 \end{figure}
 
-\section{Implementation of Functionality F1}
+\section{Building the Pothole Reporting Flow}
 
-Functionality F1 corresponds to the full pothole reporting flow. This was one of the core deliverables in the semester and it is also the core feature of the application.
+The full pothole reporting flow is the central feature of the application because it connects the mobile interface, offline queue, backend API, detector, and database.
 
-The steps of F1 are:
-
-\begin{enumerate}[label=\arabic*.]
-  \item request location access;
-  \item open the camera;
-  \item capture and preview the image;
-  \item save the image, coordinates, capture time, and client report identifier locally;
-  \item send the saved report when the backend is reachable;
-  \item receive the response from the backend or keep the report queued;
-  \item display either success, merge, offline queue, or error feedback.
-\end{enumerate}
+In this flow, the app requests location access, opens the camera, captures and previews the image, and saves the image, coordinates, capture time, and client report identifier locally. It then sends the saved report when the backend is reachable, receives the response from the backend or keeps the report queued, and displays either success, merge, offline queue, or error feedback.
 
 This flow was implemented and tested end to end. The result is visible not only on the report screen, but also later in the map and dashboard. The offline queue keeps the citizen action short even when the phone is not currently connected to the backend network.
 
-\section{Implementation of Functionality F2}
+\section{Report Visualization and Management}
 
-Functionality F2 corresponds to report visualization and management. In the mobile app this means showing open reports on the map. In the administrative side this means being able to inspect the report list and change the status of an issue to resolved.
+Report visualization and management forms the second main application flow. In the mobile app this means showing open reports on the map. In the administrative side this means being able to inspect the report list and change the status of an issue to resolved.
 
-F2 was important because it proved that the application is more than just an upload form. It also has a full read-and-manage cycle.
+This functionality is important because it shows that the application is more than just an upload form. It also has a full read-and-manage cycle.
 
 \section{Testing Approach}
 
 The testing strategy of the project was mostly functional and scenario-based. Because the system depends on mobile permissions, file uploads, detector integration, containerized services, and a spatial database, the most useful tests were the ones that follow the actual user flow. I also added a small automated test for the demo detection service and a backend test run inside the Docker container.
 
-The testing environment was the following:
-
-\begin{itemize}
-  \item Docker Compose for PostgreSQL, PostGIS, and backend execution;
-  \item MiKTeX for compiling the written thesis;
-  \item Android emulator execution for the Flutter mobile application;
-  \item Chrome execution for web-oriented smoke tests during development.
-\end{itemize}
+The testing environment used Docker Compose for PostgreSQL, PostGIS, and backend execution. MiKTeX was used for compiling the written document, the Android emulator was used for the Flutter mobile application, and Chrome was used for web-oriented smoke tests.
 
 \section{Detector Evaluation and Calibration}
 
@@ -417,16 +344,7 @@ This script records, for each image, whether a pothole was detected, the confide
 
 \section{Database Integration of Detector Results}
 
-The trained model does not write to the database directly. Instead, the database is updated only after the backend has completed the full validation pipeline:
-
-\begin{enumerate}[label=\arabic*.]
-  \item the uploaded file is saved in the runtime upload directory;
-  \item the YOLO detector runs with the calibrated threshold;
-  \item non-pothole labels and low-confidence detections are rejected;
-  \item the highest-confidence pothole detection is converted into a \texttt{DetectionResult};
-  \item the report service checks PostGIS for an open nearby pothole;
-  \item the database either inserts a new row or increments the upvote count of an existing row.
-\end{enumerate}
+The trained model does not write to the database directly. Instead, the database is updated only after the backend has completed the full validation pipeline. The uploaded file is saved in the runtime upload directory, the YOLO detector runs with the calibrated threshold, and non-pothole labels or low-confidence detections are rejected. After that, the highest-confidence pothole detection is converted into a \texttt{DetectionResult}. The report service checks PostGIS for an open nearby pothole, and the database either inserts a new row or increments the upvote count of an existing row.
 
 The database is therefore not used for model training. Its role is operational: it stores accepted detections, their confidence score, the image path, location, status, and upvote count. This separation is important. The training dataset is a labelled computer-vision dataset, while the application database is a live reporting database.
 

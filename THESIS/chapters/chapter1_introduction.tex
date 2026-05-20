@@ -12,46 +12,19 @@ The technical motivation comes from the opportunity to combine several modern so
 
 \section{Problem Statement}
 
-The problem addressed in this thesis can be stated as follows:
-
-\begin{quote}
-How can a civic reporting application reduce manual user input, tolerate temporary loss of backend connectivity, prevent duplicate pothole tickets, and still provide a simple operational view for administrators?
-\end{quote}
-
-To answer this question, the system must satisfy several constraints at the same time. The mobile workflow must remain simple enough for non-technical users. The backend must provide a stable API and a clear data model. The detector must expose only the classes that the system truly supports. The database must treat location as a first-class concern rather than an afterthought. Finally, the administrator-facing interface must show a clean and prioritized list of open issues rather than an uncontrolled stream of near-identical reports.
+The problem addressed in this thesis is the design of a civic reporting application that reduces manual user input, tolerates temporary loss of backend connectivity, prevents duplicate pothole tickets, and still provides a simple operational view for administrators. To address this problem, the system must satisfy several constraints at the same time. The mobile workflow must remain simple enough for non-technical users. The backend must provide a stable API and a clear data model. The detector must expose only the classes that the system truly supports. The database must treat location as a first-class concern rather than an afterthought. Finally, the administrator-facing interface must show a clean and prioritized list of open issues rather than an uncontrolled stream of near-identical reports.
 
 \section{Objectives}
 
-The main objectives of the project are the following:
-
-\begin{enumerate}[label=\arabic*.]
-  \item Design and implement an Android-first mobile application that allows citizens to capture pothole reports using a camera-driven workflow.
-  \item Build a backend service that accepts image uploads, geographic coordinates, capture timestamps, and idempotent client report identifiers through a documented REST API.
-  \item Integrate a YOLO-based detector that classifies a report as a pothole and returns a confidence score.
-  \item Use PostGIS to merge reports that refer to the same pothole when they are within a configurable spatial radius.
-  \item Support offline report capture on the phone and automatic synchronization when the backend becomes reachable again.
-  \item Provide a lightweight administrative dashboard that visualizes reports on top of OpenStreetMap \cite{openstreetmap} and supports status management.
-  \item Document the architecture, implementation choices, and evaluation strategy in a complete bachelor thesis.
-\end{enumerate}
+The main objectives of the project are to design and implement an Android-first mobile application that allows citizens to capture pothole reports using a camera-driven workflow, and to build a backend service that accepts image uploads, geographic coordinates, capture timestamps, and idempotent client report identifiers through a documented REST API. The system also has to integrate a YOLO-based detector that classifies a report as a pothole and returns a confidence score, use PostGIS to merge reports that refer to the same pothole when they are within a configurable spatial radius, and support offline report capture on the phone with automatic synchronization when the backend becomes reachable again. The final objectives are to provide a lightweight administrative dashboard that visualizes reports on top of OpenStreetMap \cite{openstreetmap}, support status management, and document the architecture, implementation choices, and evaluation strategy in a coherent technical form.
 
 \section{Contributions}
 
-The contributions of the thesis are primarily engineering-oriented rather than algorithmic. The detector itself is not presented as a novel computer vision architecture. Instead, the project contributes:
-
-\begin{itemize}
-  \item an end-to-end software prototype that connects mobile capture, REST communication, object detection, and geospatial duplicate handling;
-  \item a fine-tuned YOLOv8n pothole detector integrated into the backend runtime;
-  \item a report data model that explicitly separates issue type, geographic position, capture time, status, and priority;
-  \item a duplicate-merging workflow that turns repeated reports into upvotes instead of redundant database rows;
-  \item an offline queue and idempotent retry workflow that prevents queued reports from being lost or counted twice;
-  \item a documented confidence calibration step that reduces false positive reports before database insertion;
-  \item an operational dashboard that links geographic context with report status and upvote counts;
-  \item a reproducible monorepo structure that keeps implementation and thesis artifacts synchronized.
-\end{itemize}
+The contributions of the thesis are primarily engineering-oriented rather than algorithmic. The detector itself is not presented as a novel computer vision architecture. Instead, the project contributes an end-to-end software prototype that connects mobile capture, REST communication, object detection, and geospatial duplicate handling. It also contributes a fine-tuned YOLOv8n pothole detector integrated into the backend runtime, a report data model that explicitly separates issue type, geographic position, capture time, status, and priority, a duplicate-merging workflow that turns repeated reports into upvotes instead of redundant database rows, and an offline queue with an idempotent retry workflow that prevents queued reports from being lost or counted twice. Finally, the work includes a documented confidence calibration step that reduces false positive reports before database insertion, an operational dashboard that links geographic context with report status and upvote counts, and a reproducible monorepo structure that keeps implementation and thesis artifacts synchronized.
 
 \section{Thesis Structure}
 
-The paper is organized in the same way in which the project was developed during the semester. After the introduction, the thesis is split into a \textit{theoretical part} and a \textit{practical part}.
+The paper is organized according to the development path of the project. After the introduction, the thesis is split into a \textit{theoretical part} and a \textit{practical part}.
 
 Chapter 2 presents the main theoretical concepts used in the project, namely mobile development, REST APIs, object detection, and spatial databases. Chapter 3 continues the theoretical part by discussing related work, existing reporting solutions, road-damage datasets, and the reasons behind the chosen technology stack.
 

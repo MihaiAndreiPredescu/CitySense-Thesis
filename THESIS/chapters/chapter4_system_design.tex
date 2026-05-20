@@ -4,45 +4,19 @@ This chapter starts the practical part of the thesis. Following the standard sof
 
 \section{Project Scope}
 
-CitySense is intended to be a focused prototype for pothole reporting. The application is not a complete municipality platform with authentication, notifications, issue assignment, or billing integration. The scope was intentionally reduced so that the project remains realistic for a bachelor thesis and so that the implemented features can be demonstrated end to end.
+CitySense is intended to be a focused prototype for pothole reporting. The application is not a complete municipality platform with authentication, notifications, maintenance dispatching, or billing integration. The scope was intentionally reduced so that the implemented features remain coherent, testable, and demonstrable end to end.
 
-The main scope boundaries are the following:
-
-\begin{itemize}
-  \item the project focuses on potholes, not on a large taxonomy of public issues;
-  \item the citizen workflow is Android-first;
-  \item the backend stores and manages reports, but it does not integrate with an external city hall system;
-  \item the administrative interface supports visualization and status change, but not complex maintenance planning.
-\end{itemize}
+The main scope boundaries are clear. The project focuses on potholes, not on a large taxonomy of public issues, and the citizen workflow is Android-first. The backend stores and manages reports, but it does not integrate with an external city hall system. The administrative interface supports visualization and status change, but not complex maintenance planning.
 
 \section{Stakeholders}
 
-Even if the prototype is small, it still has several stakeholders:
-
-\begin{enumerate}[label=\arabic*.]
-  \item \textbf{Citizen user} -- the person who notices a pothole, takes a photo, and sends the report.
-  \item \textbf{Administrator} -- the person who checks the dashboard, sees the location of reports, and marks issues as resolved.
-  \item \textbf{Developer / maintainer} -- the person responsible for configuring the backend, training the detector, and updating the system.
-  \item \textbf{Municipality} -- the final institutional beneficiary of cleaner and more structured report data.
-\end{enumerate}
+Even if the prototype is small, it still has several stakeholders. The citizen user is the person who notices a pothole, takes a photo, and sends the report. The administrator checks the dashboard, sees the location of reports, and marks issues as resolved. The developer or maintainer is responsible for configuring the backend, training the detector, and updating the system. The municipality is the final institutional beneficiary of cleaner and more structured report data.
 
 The most important design decision that follows from this stakeholder analysis is that the citizen interface must stay extremely simple, while the backend and dashboard are allowed to carry more complexity.
 
 \section{Main Usage Scenario}
 
-The basic usage scenario of CitySense is straightforward:
-
-\begin{enumerate}[label=\arabic*.]
-  \item A citizen sees a pothole and opens the mobile app.
-  \item The app requests camera and location permissions if necessary.
-  \item The user takes a photo and confirms the submission.
-  \item The app stores the photo, coordinates, capture time, and a client-side report identifier locally.
-  \item If the backend is reachable, it receives the image and metadata immediately; otherwise, the report remains queued on the phone.
-  \item The detector classifies the issue as a pothole or rejects the image.
-  \item The database checks whether a nearby pothole was already reported.
-  \item The system either creates a new report or increments the upvote counter of an existing one.
-  \item The report becomes visible on the map and in the dashboard.
-\end{enumerate}
+The basic usage scenario of CitySense is straightforward. A citizen sees a pothole and opens the mobile app. The app requests camera and location permissions if necessary, and the user takes a photo and confirms the submission. The app stores the photo, coordinates, capture time, and a client-side report identifier locally. If the backend is reachable, it receives the image and metadata immediately; otherwise, the report remains queued on the phone. The detector classifies the issue as a pothole or rejects the image, after which the database checks whether a nearby pothole was already reported. The system then either creates a new report or increments the upvote counter of an existing one, and the report becomes visible on the map and in the dashboard.
 
 This scenario guided the design of the rest of the requirements.
 
@@ -89,8 +63,8 @@ NFR1 & The citizen reporting flow should require as few manual steps as possible
 NFR2 & The system should return understandable feedback in success and failure cases. \\
 NFR3 & The backend should be modular enough to separate configuration, persistence, detection, and reporting services. \\
 NFR4 & The map view should remain understandable even when multiple users report the same pothole. \\
-NFR5 & The implementation should be easy to run locally for demonstration and thesis evaluation. \\
-NFR6 & The project should remain maintainable and easy to explain during the defense. \\
+NFR5 & The implementation should be easy to run locally for demonstration and testing. \\
+NFR6 & The project should remain maintainable and easy to explain to future developers or administrators. \\
 NFR7 & Retrying an offline report should be idempotent, so the same client submission must not increase the duplicate counter more than once. \\
 \bottomrule
 \end{tabular}
@@ -98,71 +72,29 @@ NFR7 & Retrying an offline report should be idempotent, so the same client submi
 \label{tab:nonfunctional_requirements}
 \end{table}
 
-\section{Requirements for the Two Main Functionalities}
+\section{Requirements for the Two Main Application Flows}
 
-During the semester, the laboratory work also asked for demonstrable functionalities. In the context of this thesis, the two main functionalities are:
+The implementation is organized around two main application flows. The first is the report submission flow, where the user captures a photo, obtains location, sends the report, and receives feedback. The second is report visualization and management, where the system displays active reports on a map and allows an administrator to resolve them.
 
-\begin{itemize}
-  \item \textbf{F1 -- Report submission flow}: capture a photo, obtain location, send the report, and receive feedback.
-  \item \textbf{F2 -- Report visualization and management}: display active reports on a map and allow an administrator to resolve them.
-\end{itemize}
-
-These two functionalities are sufficient for showing the main idea of the project during a demo and they also map well to the most important requirements from the previous section.
+These two flows cover the most important citizen-facing and administrator-facing behavior, and they also map well to the most important requirements from the previous section.
 
 \section{Use Cases}
 
 \subsection{Use Case 1: Submit a Pothole Report}
 
-\textbf{Actor:} Citizen user
+The actor is the citizen user. The preconditions are that the mobile app is installed and opened, and that camera and location services are available.
 
-\textbf{Preconditions:}
-\begin{itemize}
-  \item The mobile app is installed and opened.
-  \item Camera and location services are available.
-\end{itemize}
+In the main flow, the user taps the report button and the app requests location if needed. The user captures a pothole photo, then the app saves the image, coordinates, capture time, and client report identifier locally. If the backend is reachable, the app uploads the saved report and the backend processes the request. The user then receives a success or error message.
 
-\textbf{Main flow:}
-\begin{enumerate}[label=\arabic*.]
-  \item The user taps the report button.
-  \item The app requests location if needed.
-  \item The user captures a pothole photo.
-  \item The app saves the image, coordinates, capture time, and client report identifier locally.
-  \item The app uploads the saved report if the backend is reachable.
-  \item The backend processes the request.
-  \item The user receives a success or error message.
-\end{enumerate}
-
-\textbf{Postcondition:} A new report is created or merged with an existing one.
-
-\textbf{Alternative flow:} If the backend cannot be reached, the local report remains in the offline queue. The application retries synchronization when connectivity changes or when the app is resumed. Once the backend is reachable on the configured network address, the queued report is sent using the same client report identifier.
+The postcondition is that a new report is created or merged with an existing one. In the alternative flow, if the backend cannot be reached, the local report remains in the offline queue. The application retries synchronization when connectivity changes or when the app is resumed. Once the backend is reachable on the configured network address, the queued report is sent using the same client report identifier.
 
 \subsection{Use Case 2: View Active Reports}
 
-\textbf{Actor:} Citizen user or administrator
-
-\textbf{Main flow:}
-\begin{enumerate}[label=\arabic*.]
-  \item The user opens the map screen.
-  \item The app requests the list of open reports from the backend.
-  \item The reports are rendered as map markers.
-  \item The user taps a marker to inspect details, including confidence, status, upvotes, coordinates, and the date and time when the last photo report was taken.
-\end{enumerate}
-
-\textbf{Postcondition:} The user understands where active pothole reports are located.
+The actor is the citizen user or administrator. In the main flow, the user opens the map screen and the app requests the list of open reports from the backend. The reports are rendered as map markers. When the user taps a marker, the application shows details such as confidence, status, upvotes, coordinates, and the date and time when the last photo report was taken. The postcondition is that the user understands where active pothole reports are located.
 
 \subsection{Use Case 3: Resolve a Report}
 
-\textbf{Actor:} Administrator
-
-\textbf{Main flow:}
-\begin{enumerate}[label=\arabic*.]
-  \item The administrator opens the dashboard.
-  \item The administrator filters or selects a report.
-  \item The status is changed from \texttt{OPEN} to \texttt{RESOLVED}.
-  \item The map and report list are refreshed.
-\end{enumerate}
-
-\textbf{Postcondition:} The resolved issue no longer appears in the default open-report view.
+The actor is the administrator. In the main flow, the administrator opens the dashboard and filters or selects a report. The status is changed from \texttt{OPEN} to \texttt{RESOLVED}, and the map and report list are refreshed. The postcondition is that the resolved issue no longer appears in the default open-report view.
 
 \section{Data Specification}
 
